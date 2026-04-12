@@ -26,8 +26,6 @@
 
 ```sh
 python3 sql.py
-python3 sql.py --help
-python3 sql.py --menu
 ```
 
 ## أمثلة
@@ -35,54 +33,8 @@ python3 sql.py --menu
 ### فحص تلقائي
 
 ```sh
-python3 sql.py -u 'https://example.com/item?id=1' -t auto
+python3 sql.py
 ```
-
-### فحص `sql`
-
-```sh
-python3 sql.py -u 'https://example.com/item?id=1' -t sqli
-```
-
-### فحص `XSS`
-
-```sh
-python3 sql.py -u 'https://example.com/search?q=test' -t xss
-```
-
-### فحص `IDOR`
-
-```sh
-python3 sql.py -u 'https://example.com/api/user?id=12' -t idor
-```
-
-### فحص تجاوز التحقق
-
-```sh
-python3 sql.py -u 'https://example.com/login' -t auth
-```
-
-### بصمة الهدف
-
-```sh
-python3 sql.py -u 'https://example.com' -t fp
-```
-
-## الخيارات
-
-- `-u` الرابط
-- `-p` الحمولة
-- `-m` الطريقة
-- `-P` اسم المتغير
-- `-t` نوع الفحص
-- `-f` ملف روابط
-- `--menu` تشغيل القائمة
-- `--proxy` بروكسي
-- `--proxy-file` ملف بروكسيات
-- `--delay` مهلة بين الطلبات
-- `--no-delay` إلغاء المهلة
-- `--cookies` كوكيز
-- `--fingerprint` بصمة متصفح
 
 ## ملاحظات
 
